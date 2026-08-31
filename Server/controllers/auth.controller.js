@@ -1,4 +1,4 @@
-import { User } from "../models/user.models.js";
+import User from "../models/user.models.js";
 import bcrypt from 'bcryptjs' ;
 import jwt from 'jsonwebtoken' ; 
 const generateToken = user => {
@@ -31,14 +31,17 @@ export const registerUser = async (req ,res) => {
             message : "Fill Entries First!!!"
         })
     }
-    const existingUser = await User.findOne({email}) ;
+    const existingUser = await User.findOne({email : email.toLowerCase().trim()}) ;
     if(existingUser)  {
-        throw new Error('User with this email already exists') ; 
+        return res.status(402).json({
+            success : false , 
+            message : "Email Already Exists."
+        })
     }
     const hashpassword = await bcrypt.hash(password , 10); 
     const user = await User.create({
         name , 
-        email , 
+        email : email.toLowerCase().trim() , 
         hashpassword,
         role,
     })
@@ -52,6 +55,7 @@ export const registerUser = async (req ,res) => {
     name : user.name , 
     email : user.email , 
     role : user.role,
+    
    }
     })
     } catch (error) {
@@ -72,7 +76,7 @@ export const login  = async (req ,res) => {
         }
 
         const user = await User.findOne( {
-            email : email 
+            email : email.toLowerCase().trim()
         }) ; 
         if(!user) {
             return res.status(401).json({

@@ -54,10 +54,19 @@ const ticketSchema = new mongoose.Schema( {
     slaTargetMinutes : {type : Number , required : true} , 
     clock : {
      accumulatedMs : {type : Number , default : 0} , 
-     pendingSince : {type : Date , default : null} ,
+     runningSince : {type : Date , default : null} ,
     },
+resolvedAt : {type : Date , default :null} 
+    ,
     closedAt : {type : Date , default : null}
 
 } , {timestamps : true}) ; 
 
-export default Ticket = mongoose.model("Ticket",ticketSchema) ; 
+ticketSchema.pre('validate' , (next) => {
+    if(this.primaryAssignee && this.collaborators.some(c=>c.equals((this.primaryAssignee)))) {
+        return next(new Error('primaryAssignee cannot also be listed as a collaborator'))
+    }
+    next();
+});
+const Ticket = mongoose.model("Ticket",ticketSchema) ; 
+export default Ticket ; 
