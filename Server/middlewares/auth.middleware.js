@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken' ; 
-import User from '../models/user.models';
+import User from '../models/user.models.js';
 export const authenticate = async (req,res,next) => {
 try {
     const token = req.cookies?.token ; 
@@ -27,7 +27,7 @@ try {
     })
 }
 }
-export const requireRole = (...roles) => (req,res,next) => {
+export const requireRole = (...roles) => function(req,res,next) {
     if(!roles.includes(req.user.role)) {
         return res.status(403).json({success : false, message : 'Access Denied'})
     }

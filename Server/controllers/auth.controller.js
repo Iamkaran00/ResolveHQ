@@ -21,19 +21,15 @@ const cookieOptions = {
   sameSite : "lax" , 
   maxAge : 7*24*60*60*1000,
 };
-export const registerUser = async (req ,res) => {
+ export const registerUser = async (req ,res) => {
     try {
-        
-    const {name , email , password , role} = req.body ; 
+    const {name , email , password} = req.body ;   
     if(!name || !email || !password) {
-        return res.status(400).json( {
-            success : false , 
-            message : "Fill Entries First!!!"
-        })
+        return res.status(400).json( { success : false , message : "Fill Entries First!!!" })
     }
     const existingUser = await User.findOne({email : email.toLowerCase().trim()}) ;
     if(existingUser)  {
-        return res.status(402).json({
+        return res.status(409).json({              
             success : false , 
             message : "Email Already Exists."
         })
@@ -43,28 +39,17 @@ export const registerUser = async (req ,res) => {
         name , 
         email : email.toLowerCase().trim() , 
         hashpassword,
-        role,
+        role : "agent",                               
     })
- const token = generateToken(user) ; 
- res.cookie('token' , token , cookieOptions) ; 
-
+    const token = generateToken(user) ; 
+    res.cookie('token' , token , cookieOptions) ; 
     return res.status(201).json({
-   message : "Signup Succeed" , 
-   user :  {
-    id : user._id , 
-    name : user.name , 
-    email : user.email , 
-    role : user.role,
-    
-   }
+        message : "Signup Succeed" , 
+        user :  { id : user._id , name : user.name , email : user.email , role : user.role }
     })
     } catch (error) {
-        return res.status(500).json({
-            message : 'Internal Server Error'
-        })
+        return res.status(500).json({ message : 'Internal Server Error' })
     }
-
-
 }
 export const login  = async (req ,res) => {
     try {
@@ -74,7 +59,6 @@ export const login  = async (req ,res) => {
                 message :'Fill the Entries First' , 
             })
         }
-
         const user = await User.findOne( {
             email : email.toLowerCase().trim()
         }) ; 
@@ -121,3 +105,35 @@ export const logout = (req,res) => {
         message : 'Logout Successfull !'
     })
 }
+
+
+export const getUser = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("-hashpassword");
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role
+            }
+        });
+
+    } catch (error) {
+        console.log("Get User Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error"
+        });
+    }
+};

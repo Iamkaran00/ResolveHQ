@@ -62,11 +62,15 @@ resolvedAt : {type : Date , default :null}
 
 } , {timestamps : true}) ; 
 
-ticketSchema.pre('validate' , (next) => {
-    if(this.primaryAssignee && this.collaborators.some(c=>c.equals((this.primaryAssignee)))) {
-        return next(new Error('primaryAssignee cannot also be listed as a collaborator'))
+ticketSchema.pre('validate', function() {
+    if (
+        this.primaryAssignee &&
+        this.collaborators.some(c => c.equals(this.primaryAssignee))
+    ) {
+        throw new Error(
+            'primaryAssignee cannot also be listed as a collaborator'
+        );
     }
-    next();
 });
 const Ticket = mongoose.model("Ticket",ticketSchema) ; 
 export default Ticket ; 

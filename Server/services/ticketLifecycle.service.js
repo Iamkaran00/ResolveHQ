@@ -38,6 +38,11 @@ export const changeStatus = async (ticket , newStatus , actor) => {
   } 
   
   if (ticket.status === 'closed' && newStatus === 'open') {
+      if (!ticket.closedAt) {
+    const err = new Error("Ticket has no close timestamp; cannot verify reopen window");
+    err.status = 400;
+    throw err;
+  }
     const withinWindow = Date.now() - ticket.closedAt.getTime() <= REOPEN_WINDOW_MS ;
      if(!withinWindow) {
         const err = new Error("Reopen window has passed; this ticket stays closed") ; 
@@ -53,7 +58,6 @@ export const changeStatus = async (ticket , newStatus , actor) => {
     //freezing : bank the elapsed time , stop the clock 
      ticket.clock.accumulatedMs += Date.now() - ticket.clock.runningSince.getTime() ; 
      ticket.clock.runningSince = null ; 
-
   } else if(!wasRunning && willRun){
 // resuming : start counting again from now ; 
 ticket.clock.runningSince = new Date() ; 
