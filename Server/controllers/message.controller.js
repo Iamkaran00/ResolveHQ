@@ -5,7 +5,7 @@ import { changeStatus } from "../services/ticketLifecycle.service.js";
 export const addMessage = async(req,res) => {
     try{
         const {body , isInternal} = req.body ; 
-        if(!body) {
+        if(!body.trim()) {
             return res.status(400).json({
                 success : false , 
                 message : "body is required" 

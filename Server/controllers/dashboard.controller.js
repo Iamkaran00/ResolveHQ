@@ -1,7 +1,8 @@
 import { isBreached } from "../services/ticketLifecycle.service.js";
 import Ticket from "../models/ticket.model.js";
 export const getDashboard = async (req, res) => {
-  const baseFilter = { archived: false };
+  try{
+    const baseFilter = { archived: false };
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const eightWeeksAgo = new Date(Date.now() - 8 * 7 * 24 * 60 * 60 * 1000);
 
@@ -26,4 +27,12 @@ export const getDashboard = async (req, res) => {
     headline: { open: openCount, pending: pendingCount, resolvedThisWeek, breaching },
     byStatus, byAgent, resolvedPerWeek,
   });
+  } catch(err) {
+console.log(err) ;
+return res.status(500).json({
+  success : false, 
+  message : err.message 
+})
+  }
+  
 };

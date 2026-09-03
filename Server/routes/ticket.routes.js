@@ -37,8 +37,6 @@ router.get("/:id/messages", ...withTicket, messageController.getMessages);
 router.post("/:id/collaborators", ...withTicket, ticketController.addCollaborator);
 router.delete("/:id/collaborators", ...withTicket, ticketController.removeCollaborator);
 
-
-
 // timeline routes
 
 router.get("/:id/timeline", ...withTicket, ticketController.getTimeline);
