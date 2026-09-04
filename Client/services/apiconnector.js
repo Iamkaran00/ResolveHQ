@@ -1,22 +1,19 @@
+// src/services/apiConnector.js
+
 import axios from "axios";
 
 export const axiosInstance = axios.create({
-  baseURL: "http://localhost:5500/api/v1/",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5501/api/v1",
   withCredentials: true,
 });
 
-export const apiConnector = (
-  method,
-  url,
-  bodyData,
-  params,
-  headers
-) => {
+export const apiConnector = (method, url, bodyData, params, headers, extraConfig) => {
   return axiosInstance({
-    method: method,
-    url: url,
+    method,
+    url,
     data: bodyData || null,
-    headers: headers || null,
     params: params || null,
+    headers: headers || null,
+    ...extraConfig, // e.g. { responseType: "blob" } for CSV export
   });
 };

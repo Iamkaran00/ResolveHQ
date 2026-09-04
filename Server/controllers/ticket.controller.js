@@ -1,5 +1,5 @@
 import Ticket from "../models/ticket.model.js";
-import { CollaboratorAddedEvent, CollaboratorRemovedEvent } from "../models/timelineEvent.model.js";
+import { CollaboratorAddedEvent, CollaboratorRemovedEvent,PriorityChangeEvent,RestoreEvent,ArchiveEvent } from "../models/timelineEvent.model.js";
 import User from "../models/user.models.js";
 import { AssignmentEvent } from "../models/timelineEvent.model.js";
 import { changeStatus } from "../services/ticketLifecycle.service.js";
@@ -127,8 +127,14 @@ export const updateTicket = async (req, res) => {
             if (!PRIORITIES.includes(priority)) {
                 return res.status(400).json({ success: false, message: `priority must be one of ${PRIORITIES.join(', ')}` });
             }
+            if (priority && priority !== ticket.priority) {
+    await PriorityChangeEvent.create({
+        ticket: ticket._id, actor: req.user._id,
+        oldPriority: ticket.priority, newPriority: priority,
+    });
             ticket.priority = priority;
-        }
+              }  
+            }
         if (subject) ticket.subject = subject;
         if (description) ticket.description = description;
         if (category) ticket.category = category;
@@ -146,6 +152,7 @@ export const archiveTicket = async (req, res) => {
             return res.status(400).json({ success: false, message: "Ticket is Already archived" });
         }
         ticket.archived = true;
+        await ArchiveEvent.create({ ticket: ticket._id, actor: req.user._id })
         ticket.archivedAt = new Date();
         await ticket.save();
         return res.status(200).json({ success: true, ticket });
@@ -161,6 +168,7 @@ export const restoreTicket = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Ticket is Not Archived' });
         }
         ticket.archived = false;
+        await RestoreEvent.create({ ticket: ticket._id, actor: req.user._id });
         ticket.archivedAt = null;
         await ticket.save();
         return res.status(200).json({ success: true, message: "Successfully Restored Ticket" });

@@ -48,7 +48,8 @@ const cookieOptions = {
         user :  { id : user._id , name : user.name , email : user.email , role : user.role }
     })
     } catch (error) {
-        return res.status(500).json({ message : 'Internal Server Error' })
+        console.log(error) ; 
+        return res.status(500).json({ message : error.message })
     }
 }
 export const login  = async (req ,res) => {

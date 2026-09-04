@@ -10,13 +10,26 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mantine/core": "^9.6.0",
+    "@mantine/dates": "^9.6.0",
+    "@mantine/form": "^9.6.0",
+    "@mantine/hooks": "^9.6.0",
+    "@mantine/notifications": "^9.6.0",
     "@reduxjs/toolkit": "^2.12.0",
+    "@tabler/icons-react": "^3.46.0",
     "@tailwindcss/vite": "^4.3.3",
     "axios": "^1.20.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "framer-motion": "^13.2.0",
+    "lucide-react": "^1.40.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-hook-form": "^7.87.0",
+    "react-hot-toast": "^2.6.0",
     "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.3",
+    "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
