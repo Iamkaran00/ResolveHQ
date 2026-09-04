@@ -10,6 +10,7 @@ import Alerts from '../pages/Alerts';
 import Dashboard from '../pages/Dashboard';
 import ProtectedRoute from '../components/ProtectedRoute';
 import Navbar from '../components/Navbar';
+import CreateTicket from '../pages/CreateTicket';
 import { getCurrentUser } from '../redux/operations/authOperations';
 
 
@@ -70,7 +71,16 @@ useEffect(()=> {
                             <Dashboard />
                         </ProtectedRoute>
                     }
+
                 />
+                <Route
+    path="/tickets/new"
+    element={
+        <ProtectedRoute>
+            <CreateTicket />
+        </ProtectedRoute>
+    }
+/>
                 <Route path="/" element={<Navigate to={user ? "/tickets" : "/login"} replace />} />
                 <Route path="*" element={<NotFound />} />
             </Routes>

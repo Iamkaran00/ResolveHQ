@@ -20,6 +20,7 @@ const initialState = {
         priority: "",     // '' | low | medium | high | urgent
         category: "",     // '' | billing | technical | account | general
         assignee: "",
+        archived: "false", // "false" | "true" — which queue view is showing
         sortBy: "createdAt",   // createdAt | priority | updatedAt
         sortDir: "desc",       // asc | desc
     },

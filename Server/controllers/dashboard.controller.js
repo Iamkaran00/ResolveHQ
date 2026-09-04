@@ -17,7 +17,7 @@ export const getDashboard = async (req, res) => {
       { $group: { _id: { $isoWeek: "$resolvedAt" }, count: { $sum: 1 } } },
       { $sort: { _id: 1 } },
     ]),
-    Ticket.find({ ...baseFilter, status: { $in: ["new", "open"] } }),
+  Ticket.find({ ...baseFilter, status: { $in: ["new", "open", "pending"] } }),
   ]);
 
   const breaching = allActive.filter(isBreached).length;

@@ -1,6 +1,6 @@
 import { StatusChangeEvent } from "../models/timelineEvent.model.js";
 import { REOPEN_WINDOW_MS } from "../constants/ticketEnums.js";
-
+import SLAAlert from "../models/slaAlert.model.js";
 //the only edges server will ever accept - anything else get rejected 
 const TRANSITIONS = {
     new : ['open'] , 
@@ -75,5 +75,7 @@ ticket.clock.runningSince = new Date() ;
   })  ; 
 
   ticket.status = newStatus ; 
-
+  if (newStatus === "resolved" || newStatus === "closed") {
+    await SLAAlert.deleteMany({ ticket: ticket._id, acknowledged: false });
+  }
 };

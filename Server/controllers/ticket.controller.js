@@ -1,5 +1,5 @@
 import Ticket from "../models/ticket.model.js";
-import { CollaboratorAddedEvent, CollaboratorRemovedEvent,PriorityChangeEvent,RestoreEvent,ArchiveEvent } from "../models/timelineEvent.model.js";
+import { CollaboratorAddedEvent, CollaboratorRemovedEvent, PriorityChangeEvent, RestoreEvent, ArchiveEvent } from "../models/timelineEvent.model.js";
 import User from "../models/user.models.js";
 import { AssignmentEvent } from "../models/timelineEvent.model.js";
 import { changeStatus } from "../services/ticketLifecycle.service.js";
@@ -14,14 +14,14 @@ export const createTicket = async (req, res) => {
         if (!PRIORITIES.includes(priority)) {
             return res.status(400).json({ success: false, message: `priority must be one of ${PRIORITIES.join(", ")}` });
         }
-        let finalAssignee = primaryAssignee || null ; 
-        if(req.user.role === 'agent') {
+        let finalAssignee = primaryAssignee || null;
+        if (req.user.role === 'agent') {
           // an agent can only assign a new ticket to themselves , or leave it unassigned
-          if(finalAssignee && finalAssignee !== req.user._id.toString()) {
-            return res.status(403).json({success : false , message : 'Agent can only assign new tickets to themselves'}) ; 
+          if (finalAssignee && finalAssignee !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Agent can only assign new tickets to themselves' });
           }
         }
-        //supervisor can assign to anyone , or leave unassigned - no restriction
+        // supervisor can assign to anyone , or leave unassigned - no restriction
         const ticket = await Ticket.create({
             subject,
             description,
@@ -43,9 +43,10 @@ export const createTicket = async (req, res) => {
 
 export const listTickets = async (req, res) => {
   try {
-    const { q, status, priority, category, assignee, sortBy = "createdAt", sortDir = "desc", page = 1, limit = 20 } = req.query;
+    const { q, status, priority, category, assignee, archived, sortBy = "createdAt", sortDir = "desc", page = 1, limit = 20 } = req.query;
 
-    const filter = { archived: false };
+    // default view is the active queue; pass ?archived=true to browse archived tickets
+    const filter = { archived: archived === "true" };
     const andConditions = [];
 
     if (req.user.role === "agent") {
@@ -88,9 +89,10 @@ export const listTickets = async (req, res) => {
   }
 };
 
+// factored out so bulk export (goal 7) reuses the exact same filter logic
 export const buildTicketFilter = (req) => {
-  const { q, status, priority, category, assignee } = req.query;
-  const filter = { archived: false };
+  const { q, status, priority, category, assignee, archived } = req.query;
+  const filter = { archived: archived === "true" };
   const andConditions = [];
 
   if (req.user.role === "agent") {
@@ -107,7 +109,6 @@ export const buildTicketFilter = (req) => {
   return filter;
 };
 
-// FIXED: was referencing an undefined `id`, had no try/catch
 export const getTicketById = async (req, res) => {
   try {
     const ticket = await Ticket.findById(req.ticket._id)
@@ -128,17 +129,23 @@ export const updateTicket = async (req, res) => {
                 return res.status(400).json({ success: false, message: `priority must be one of ${PRIORITIES.join(', ')}` });
             }
             if (priority && priority !== ticket.priority) {
-    await PriorityChangeEvent.create({
-        ticket: ticket._id, actor: req.user._id,
-        oldPriority: ticket.priority, newPriority: priority,
-    });
-            ticket.priority = priority;
-              }  
+                await PriorityChangeEvent.create({
+                    ticket: ticket._id, actor: req.user._id,
+                    oldPriority: ticket.priority, newPriority: priority,
+                });
+                ticket.priority = priority;
             }
+        }
         if (subject) ticket.subject = subject;
         if (description) ticket.description = description;
         if (category) ticket.category = category;
         await ticket.save();
+
+        await ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
         return res.status(200).json({ success: true, ticket });
     } catch (error) {
         return res.status(500).json({ success: false, message: 'failed to update ticket', error: error.message });
@@ -152,7 +159,7 @@ export const archiveTicket = async (req, res) => {
             return res.status(400).json({ success: false, message: "Ticket is Already archived" });
         }
         ticket.archived = true;
-        await ArchiveEvent.create({ ticket: ticket._id, actor: req.user._id })
+        await ArchiveEvent.create({ ticket: ticket._id, actor: req.user._id });
         ticket.archivedAt = new Date();
         await ticket.save();
         return res.status(200).json({ success: true, ticket });
@@ -171,7 +178,7 @@ export const restoreTicket = async (req, res) => {
         await RestoreEvent.create({ ticket: ticket._id, actor: req.user._id });
         ticket.archivedAt = null;
         await ticket.save();
-        return res.status(200).json({ success: true, message: "Successfully Restored Ticket" });
+        return res.status(200).json({ success: true, ticket });
     } catch (error) {
        return res.status(500).json({ success: false, message: 'Failed to restore ticket', error: error.message });
     }
@@ -179,9 +186,7 @@ export const restoreTicket = async (req, res) => {
 
 export const reassignTicket = async (req, res) => {
     try {
-      
         const ticket = req.ticket;
-        console.log(req.body) ; 
         const { newAssigneeId } = req.body;
         if (!newAssigneeId) {
             return res.status(400).json({ success: false, message: 'newAssignee is required' });
@@ -210,6 +215,12 @@ export const reassignTicket = async (req, res) => {
         });
         ticket.primaryAssignee = newAssigneeId;
         await ticket.save();
+
+        await ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
         return res.status(200).json({ success: true, ticket });
     } catch (error) {
         return res.status(500).json({ success: false, message: 'Failed to Reassign ticket', error: error.message });
@@ -224,6 +235,7 @@ export const updateTicketStatus = async (req, res) => {
         }
         await changeStatus(req.ticket, status, req.user);
         await req.ticket.save();
+        
         return res.status(200).json({ success: true, ticket: req.ticket });
     } catch (error) {
         console.log(error);
@@ -239,7 +251,6 @@ export const addCollaborator = async (req, res) => {
             return res.status(403).json({ success: false, message: "Only the primary Assignee or supervisor can add collaborators" });
         }
         const agent = await User.findById(agentId);
-        console.log(agent) ; 
         if (!agent || agent.role !== 'agent') {
             return res.status(400).json({ success: false, message: 'collaborators must be existing agents' });
         }
@@ -252,6 +263,12 @@ export const addCollaborator = async (req, res) => {
 
         ticket.collaborators.push(agentId);
         await ticket.save();
+
+        await ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
         await CollaboratorAddedEvent.create({ ticket: ticket._id, actor: req.user._id, collaborator: agentId });
         return res.status(200).json({ success: true, ticket });
     } catch (error) {
@@ -268,6 +285,12 @@ export const removeCollaborator = async (req, res) => {
         }
         ticket.collaborators = ticket.collaborators.filter((c) => c.toString() !== agentId);
         await ticket.save();
+
+        await ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
         await CollaboratorRemovedEvent.create({ ticket: ticket._id, actor: req.user._id, collaborator: agentId });
         return res.status(200).json({ success: true, ticket });
     } catch (error) {
@@ -347,12 +370,11 @@ export const getTimeline = async (req, res) => {
   return res.status(200).json({ success: true, events });
 };
 
-export const listAgents = async (req ,res) => {
+export const listAgents = async (req, res) => {
     try {
-        const agents = await User.find({role : 'agent'} , 'name email') ; 
-        return res.status(200).json({success : true , agents}) ; 
-
+        const agents = await User.find({ role: 'agent' }, 'name email');
+        return res.status(200).json({ success: true, agents });
     } catch (error) {
-        return res.status(500).json({success : false , message :error.message}) ; 
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};

@@ -73,7 +73,7 @@ function Navbar() {
                             <IconTicket size={13} color="white" />
                         </div>
                         <Text fw={700} size="sm" c={isDark ? "#F4F3F0" : "#0F1115"}>
-                            ResolvHQ
+                            ResolveHQ
                         </Text>
                     </Group>
 
