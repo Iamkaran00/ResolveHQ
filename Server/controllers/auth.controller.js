@@ -23,6 +23,7 @@ const cookieOptions = {
 };
  export const registerUser = async (req ,res) => {
     try {
+      console.log(req);
     const {name , email , password} = req.body ;   
     if(!name || !email || !password) {
         return res.status(400).json( { success : false , message : "Fill Entries First!!!" })
