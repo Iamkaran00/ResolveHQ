@@ -22,7 +22,7 @@ app.use(express.urlencoded({limit : '10kb',extended : true})) ;
 app.use(express.json({limit : '100kb'})) ; 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://resolve-hq.vercel.app",
     credentials: true,
   })
 );
