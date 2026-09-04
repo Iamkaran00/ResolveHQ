@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Text } from "@mantine/core";
-import { useSlaCountdown } from "../hooks/useSlaCountdown";
+import { useSlaCountdown } from "../Hooks/useSlaCountdown";
+
 const COLOR = { healthy: "#2F8F5B", at_risk: "#C97A2B", breached: "#9E2B3E" };
 
 export default function SlaTimer({ ticket }) {
