@@ -208,7 +208,6 @@ export const reassignTicket = async (req, res) => {
     }
 };
 
-// FIXED: was returning { status: true, ... }, now consistent with every other endpoint
 export const updateTicketStatus = async (req, res) => {
     try {
         const { status } = req.body;
