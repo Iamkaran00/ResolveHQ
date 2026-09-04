@@ -18,6 +18,7 @@ router.get('/',ticketController.listTickets) ;
 router.patch("/bulk/reassign", ticketController.bulkReassign);
 router.patch("/bulk/close", ticketController.bulkClose);
 router.get("/export", ticketController.exportCsv);
+router.get('/agents' , ticketController.listAgents) ; 
 //everything below needs a specific ticket , loaded once and access-checked once will be good practice 
 const withTicket = [loadTicket(Ticket),requireTicketAccess] ; 
 

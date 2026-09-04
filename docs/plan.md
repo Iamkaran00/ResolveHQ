@@ -9,449 +9,161 @@ The assessment explicitly emphasizes incremental development, reasoning, trade-o
 ---
 
 # Phase 1: Foundation
+## Status: Completed
 
-## Status: Completed / In Progress
-
-### Completed
-
-* Repository initialized
-* GitHub repository created
-* Backend initialized with Node.js
-* Express configured
-* Environment configuration started
-* MongoDB connection established
-* Basic server created
-* Development script configured with Nodemon
+* Repository initialized, GitHub repository created
+* Backend initialized with Node.js, Express configured
+* MongoDB connection established, basic server running
 * Backend folder structure established
 
 ---
 
-# Phase 2: Initial Data Modeling
-
+# Phase 2: Data Modeling
 ## Status: Completed
 
-### User Model
+Implemented: `User`, `Ticket`, `Message`, `TimelineEvent` (with discriminators for status_change, assignment, collaborator_added/removed, reply, internal_note, priority_change, archived, restored), `SLAAlert`.
 
-Implemented:
-
-* name
-* email
-* passwordHash
-* role
-* timestamps
-
-Roles:
-
-```text
-agent
-supervisor
-```
-
-### Ticket Model
-
-Implemented:
-
-* subject
-* description
-* requester
-* priority
-* category
-* status
-* primaryAssignee
-* collaborators
-* archive state
-* SLA target
-* SLA clock
-* closedAt
-* timestamps
-
-The initial schema was intentionally simplified after reviewing a more complex proposed design.
+The Ticket clock design evolved during implementation from a single `pendingSince` field to `{ accumulatedMs, runningSince }`, since the earlier shape couldn't cleanly express "paused vs. running" across more than one non-active status (Pending, Resolved, and Closed all needed to pause the clock, not just Pending).
 
 ---
 
-# Phase 3: Authentication
+# Phase 3: Authentication & Authorization
+## Status: Completed and verified
 
-## Status: Implementing
+* bcrypt password hashing, JWT in HttpOnly cookie, login/signup/logout
+* Role-based middleware (`authenticate`, `requireRole`)
+* Ticket-level access middleware (`loadTicket`, `requireTicketAccess`) enforcing "primary assignee or collaborator" per goal 1
+* Public signup deliberately restricted to `role: "agent"` only — supervisor accounts are seeded separately, since open self-registration into a privileged role is a real access-control gap the brief doesn't require leaving open
 
-### Completed / Built
-
-* bcrypt password hashing
-* JWT generation
-* JWT stored in HttpOnly cookie
-* Login flow
-* Signup flow
-* Logout flow
-* Authentication middleware
-* Role information included in JWT
-* Initial Agent/Supervisor authorization middleware
-
-Current authentication flow:
-
-```text
-Signup/Login
-     ↓
-bcrypt
-     ↓
-JWT
-     ↓
-HttpOnly cookie
-     ↓
-auth middleware
-     ↓
-req.user
-```
-
-### Remaining
-
-* Test complete auth flow
-* Add protected test endpoint
-* Verify invalid token behavior
-* Verify expired token behavior
-* Verify Agent/Supervisor authorization behavior
-* Add demo users/seed data
-
+### Verified by manual testing
+* Agent blocked (403) from a ticket they're not assigned to or collaborating on
+* Supervisor unrestricted across all tickets
+* Agent blocked (403) from reassigning a ticket away from themselves
+* Agent successfully reassigns/claims within the allowed rule; supervisor reassigns freely
+ls
 ---
 
 # Phase 4: Ticket CRUD
+## Status: Implemented, not yet tested end-to-end
 
-## Planned
-
-Implement:
-
-* Create ticket
-* List tickets
-* View ticket
-* Update ticket
-* Archive ticket
-* Restore ticket
+Create, list (role-scoped), get, update, archive, restore — all built. `createTicket` verified working; not yet re-verified across all four priorities after the most recent bug-fix round.
 
 ---
 
 # Phase 5: Ticket Assignment
+## Status: Implemented, not yet re-tested after recent fixes
 
-## Planned
+Reassignment enforces: supervisors unrestricted; agents can act only if primary assignee or collaborator; agent-as-primary-assignee cannot hand the ticket to someone else. Collaborator add/remove implemented, gated to primary assignee or supervisor.
 
-Implement:
-
-* Primary assignment
-* Reassignment
-* Collaborators
-* Add collaborator
-* Remove collaborator
-* Permission enforcement
-
-Important business rule:
-
-Assignment permissions must be enforced by the backend rather than relying only on the React interface.
+**Open decision, not yet resolved:** whether a collaborator (not primary assignee) should be able to reassign the ticket between two *other* agents. Needs a decision before final submission — see `docs/decisions.md`.
 
 ---
 
 # Phase 6: Ticket Lifecycle
+## Status: Implemented, not yet tested
 
-## Planned
+State machine (`new → open → pending → resolved → closed`, with `resolved → open` and `closed → open` within a reopen window) implemented in `ticketLifecycle.service.js` as business logic, not Mongoose enum validation. Closing is restricted to supervisors. Clock runs only in `new`/`open`; pauses in `pending`, `resolved`, and `closed`.
 
-Implement:
-
-```text
-NEW
- ↓
-OPEN
- ↓
-PENDING
- ↓
-OPEN
- ↓
-RESOLVED
- ↓
-CLOSED
-```
-
-Also implement valid reopening behavior.
-
-Invalid transitions must be rejected by the server.
-
-The lifecycle is a business rule and therefore should be implemented in the service layer rather than relying only on Mongoose enum validation.
+**Not yet verified:** the full transition sequence, reopen-window rejection after expiry, and the Pending→Open auto-resume triggered by a customer-visible reply — the single most load-bearing interaction in the app, never run once yet.
 
 ---
 
 # Phase 7: Replies and Internal Notes
+## Status: Implemented, not yet tested
 
-## Planned
-
-Implement:
-
-* Customer-visible replies
-* Internal notes
-* Message history
-* Author information
-* Timestamps
-* Internal-note visibility enforcement
-
-The Message model will be added when this feature is implemented.
+`Message` model with `reply`/`internal_note` types. Adding a non-internal reply to a Pending ticket is wired to call the lifecycle service and reopen it automatically. This exact path had a live bug (`req.ticket.save()` mistyped) found and fixed today — not re-tested since.
 
 ---
 
 # Phase 8: Audit Timeline
+## Status: Partially implemented
 
-## Planned
+Status changes, reassignments, replies, internal notes, and collaborator add/remove are logged via discriminators. Archive/restore and priority-change events have discriminators defined but nothing calls them yet — a gap to close before submission.
 
-Record meaningful ticket changes such as:
-
-* Ticket creation
-* Status changes
-* Assignment
-* Reassignment
-* Collaborator changes
-* Replies
-* Internal notes
-* Archive/restore
-* Other important mutations
-
-Every event should identify:
-
-```text
-what
-who
-when
-```
-
-Audit history should be append-only.
+Read endpoint (`GET /:id/timeline`) built, not yet tested against a ticket with a real mixed event history.
 
 ---
 
 # Phase 9: SLA Tracking
+## Status: Implemented, sweep job just wired — untested
 
-## Planned
+Response clock, breach/at-risk thresholds, alert creation/acknowledgement built. A periodic sweep job (`startSlaSweep`, 60-second interval) was just wired into the server entry point today — before this it existed as dead code nothing called, meaning no alert could ever have fired.
 
-Implement:
-
-* Priority-based SLA targets
-* Response clock
-* Pending pause
-* Resume behavior
-* At-risk detection
-* Breach detection
-* Alert creation
-* Alert acknowledgement
-* Repeat breach after reopening
-
-The Ticket schema already contains the initial SLA state required for this implementation.
+**Not yet verified:** whether an alert appears un-prompted after the sweep interval, and whether reopening a ticket that breaches again produces a new alert rather than leaving a stale acknowledged one.
 
 ---
 
 # Phase 10: Queue and Search
+## Status: Implemented, not yet tested
 
-## Planned
-
-Implement server-side:
-
-* Text search
-* Status filtering
-* Priority filtering
-* Category filtering
-* Assignee filtering
-* Sorting
-* Pagination
-* My Work
-* Unassigned
-* SLA attention
-
-The React client should not load the entire ticket dataset and perform all filtering locally.
+Server-side regex search (chosen over a `$text` index to keep the schema simpler at this project's scale), status/priority/category/assignee filters, sort, pagination. Role-scoping and search conditions combined via `$and` to avoid a two-`$or` collision that would otherwise let an agent's query bypass their own scope restriction.
 
 ---
 
 # Phase 11: Bulk Operations
+## Status: Implemented, not yet tested
 
-## Planned
-
-Implement:
-
-* Bulk reassign
-* Bulk close
-
-The API should support partial success.
-
-Example:
-
-```json
-{
-    "successful": [
-        "ticket-1",
-        "ticket-2"
-    ],
-    "failed": [
-        {
-            "ticket": "ticket-3",
-            "reason": "Permission denied"
-        }
-    ]
-}
-```
+Bulk reassign and bulk close, each returning a per-ticket `{ ticketId, success, reason }` array. A route-ordering bug (bulk/export routes shadowed by `/:id` routes matched earlier) found and fixed today — not yet re-verified.
 
 ---
 
 # Phase 12: CSV Export
+## Status: Implemented, not yet tested
 
-## Planned
-
-Implement CSV export based on the currently filtered ticket set.
-
-The export should respect relevant:
-
-* Search
-* Filters
-* Sorting
-* Query parameters
+Reuses the same filter-building logic as search, so the export always matches whatever the queue view is currently showing.
 
 ---
 
 # Phase 13: Dashboard
+## Status: Implemented, not yet tested
 
-## Planned
-
-Create dashboard metrics for:
-
-* Open tickets
-* Pending tickets
-* Resolved tickets
-* Closed tickets
-* SLA at-risk tickets
-* SLA breached tickets
-* Agent workload
+Headline counts, status/agent breakdowns, 8-week resolution trend, breach count (computed in application code over fetched tickets rather than in the aggregation pipeline — a deliberate scope simplification). A missing `Ticket` import was caught and fixed today; this route has not been hit successfully yet.
 
 ---
 
 # Phase 14: React Frontend
-
-## Planned
-
-Build:
-
-```text
-Login
-  ↓
-Queue
-  ↓
-Ticket Detail
-  ↓
-Conversation
-  ↓
-Assignment
-  ↓
-Collaborators
-  ↓
-Audit Timeline
-  ↓
-SLA Alerts
-  ↓
-Dashboard
-```
-
-The interface should prioritize clarity and fast ticket handling.
+## Status: Not started
 
 ---
 
 # Phase 15: Testing
+## Status: In progress — the actual current bottleneck
 
-## Planned
+Everything in Phases 4–13 has been *written*, not *proven*. Nothing below is marked done until it's been run and its actual response inspected.
 
-Focus testing on business-critical behavior:
-
-### Authentication
-
-* Valid login
-* Invalid password
-* Missing token
-* Invalid token
-* Logout
-
-### Authorization
-
-* Agent permissions
-* Supervisor permissions
-* Unauthorized operation
-
-### Ticket Lifecycle
-
-* Valid transitions
-* Invalid transitions
-* Reopening
-
-### SLA
-
-* Clock start
-* Pending pause
-* Resume
-* At-risk
-* Breach
-* Repeat breach
-
-### Audit
-
-* Creation of expected audit events
-* Correct actor
-* Correct timestamp
-* Append-only behavior
+### Test checklist, in priority order
+- [ ] Full lifecycle sequence including illegal-transition rejection
+- [ ] Pending → Open auto-resume via customer-visible reply
+- [ ] Close restricted to supervisor; reopen-window rejection after expiry
+- [ ] Access control re-verified after the recent bug-fix round
+- [ ] Collaborator add/remove, including the assignee-can't-be-collaborator rule
+- [ ] Search + filter combinations, scoped correctly per role
+- [ ] Bulk action with a mixed valid/invalid batch (partial success reporting)
+- [ ] CSV export actually downloads (route-shadowing fix verification)
+- [ ] Timeline shows a correct, chronological mixed-event history
+- [ ] SLA alert appears un-prompted after the sweep interval
+- [ ] Reopen-and-rebreach produces a new alert, not a stale acknowledged one
+- [ ] Dashboard returns real numbers without error
 
 ---
 
 # Phase 16: Deployment
-
-## Planned
-
-* Deploy backend
-* Deploy React frontend
-* Configure MongoDB
-* Configure environment variables
-* Verify production CORS
-* Verify authentication cookies
-* Seed demo data
-* Test live application
-
-The assessment requires a reachable live application with demo data and credentials.
+## Status: Not started
 
 ---
 
 # Phase 17: Final Submission
+## Status: Not started
 
-## Planned
-
-Before submission:
-
-* README completed
-* SUBMISSION.md completed
-* Five documentation files completed
-* Git history reviewed
-* AI prompt history reviewed
-* Demo accounts verified
-* Live URL verified
-* API verified
-* Frontend verified
-* Final requirement checklist completed
+Stretch ideas from the brief (canned responses, CSAT rating, status page, tagging, knowledge base, auto-routing, ticket merging, priority-varying SLA policies, email digest) are explicitly out of scope until all ten core goals are tested and confirmed working — the brief states these don't substitute for a core goal and doing ten well beats ten plus extras done badly.
 
 ---
 
 # Development Workflow
 
-Each significant feature should follow:
-
 ```text
-Understand requirement
-        ↓
-Design
-        ↓
-Record important decision
-        ↓
-Implement
-        ↓
-Test
-        ↓
-Update documentation
-        ↓
-Meaningful Git commit
+Understand requirement → Design → Record decision → Implement → Test → Update documentation → Meaningful Git commit
 ```
-
-This is intentionally aligned with the assessment's requirement for incremental Git history and documentation throughout development.
 
 ---
 
@@ -460,21 +172,21 @@ This is intentionally aligned with the assessment's requirement for incremental 
 ```text
 Foundation             ██████████ 100%
 Data Modeling          ██████████ 100%
-Authentication         ███████░░░  70%
-Authorization          ████░░░░░░  40%
+Authentication         ██████████ 100%
+Authorization          ██████████ 100%
 
-Ticket CRUD            ░░░░░░░░░░   0%
-Lifecycle              ░░░░░░░░░░   0%
-Messages               ░░░░░░░░░░   0%
-Audit                  ░░░░░░░░░░   0%
-SLA                    ░░░░░░░░░░   0%
-Queue/Search           ░░░░░░░░░░   0%
-Bulk Operations        ░░░░░░░░░░   0%
-CSV                    ░░░░░░░░░░   0%
-Dashboard              ░░░░░░░░░░   0%
-React UI               ░░░░░░░░░░   0%
-Testing                ░░░░░░░░░░   0%
-Deployment             ░░░░░░░░░░   0%
+Ticket CRUD             ███████░░░  70%  (built, untested)
+Assignment              ███████░░░  70%  (built, one open decision)
+Lifecycle               ███████░░░  70%  (built, untested — highest risk)
+Messages                ███████░░░  70%  (built, untested)
+Audit                   █████░░░░░  50%  (partial — archive/priority events unwired)
+SLA                     ███████░░░  70%  (built, sweep job just wired, untested)
+Queue/Search            ███████░░░  70%  (built, untested)
+Bulk Operations         ███████░░░  70%  (built, untested)
+CSV                     ███████░░░  70%  (built, untested)
+Dashboard               ███████░░░  70%  (built, untested)
+
+React UI                ░░░░░░░░░░   0%
+Testing                 ██░░░░░░░░  20%  (only auth/access verified)
+Deployment              ░░░░░░░░░░   0%
 ```
-
-This progress representation is a working snapshot and should be updated as implementation continues.

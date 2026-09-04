@@ -339,3 +339,13 @@ export const getTimeline = async (req, res) => {
 
   return res.status(200).json({ success: true, events });
 };
+
+export const listAgents = async (req ,res) => {
+    try {
+        const agents = await User.find({role : 'agent'} , 'name email') ; 
+        return res.status(200).json({success : true , agents}) ; 
+
+    } catch (error) {
+        return res.status(500).json({success : false , message :error.message}) ; 
+    }
+}
