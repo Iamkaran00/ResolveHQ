@@ -107,7 +107,7 @@ function Navbar() {
                 <Group justify="space-between" h={58} style={{ maxWidth: 1200, margin: "0 auto" }}>
                     <Group gap={36}>
                         <UnstyledButton
-                            onClick={() => navigate(user ? "/tickets" : "/")}
+                            onClick={() => navigate(user ? "/" : "/")}
                             style={{ display: "flex", alignItems: "center", gap: 9 }}
                         >
                             <div
