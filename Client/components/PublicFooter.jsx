@@ -36,9 +36,8 @@ export default function PublicFooter() {
                             A support ticket queue that keeps ownership, replies, and history in one place.
                         </Text>
                         <Group gap={8} mt={8}>
-                            <ActionIcon variant="subtle" color="gray" radius="sm" aria-label="GitHub"><IconBrandGithub size={16} /></ActionIcon>
-                            <ActionIcon variant="subtle" color="gray" radius="sm" aria-label="X (Twitter)"><IconBrandX size={16} /></ActionIcon>
-                            <ActionIcon variant="subtle" color="gray" radius="sm" aria-label="LinkedIn"><IconBrandLinkedin size={16} /></ActionIcon>
+                            <ActionIcon variant="subtle" href="https://github.com/Iamkaran00/ResolveHQ" color="gray" radius="sm" aria-label="GitHub"><IconBrandGithub size={16} /></ActionIcon>
+                            
                         </Group>
                     </Stack>
 
