@@ -8,7 +8,6 @@ import { auth_endpoints } from '../../services/api';
 const { SIGNUP_API, LOGIN_API, LOGOUT_API, GET_USER_API } = auth_endpoints;
 
 export const signUp = (name, email, password) => async (dispatch) => {
-    console.log(name) ; 
     dispatch(setLoading(true));
     dispatch(setError(null));
     try {

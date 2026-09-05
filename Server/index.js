@@ -22,7 +22,7 @@ app.use(express.urlencoded({limit : '10kb',extended : true})) ;
 app.use(express.json({limit : '100kb'})) ; 
 app.use(
   cors({
-    origin: "https://resolve-hq.vercel.app/",
+    origin: "https://resolve-hq.vercel.app",
     credentials: true,
   })
 );
@@ -30,7 +30,6 @@ app.use((req, res, next) => {
   console.log("REQUEST RECEIVED");
   console.log("Method:", req.method);
   console.log("URL:", req.originalUrl);
-  console.log('hello') ; 
   next();
 });
 app.use('/api/v1/auth',userRoutes) ; 
