@@ -1,32 +1,16 @@
+// src/pages/Dashboard.jsx
+
 import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { 
-    Text, 
-    Group, 
-    Stack, 
-    Paper, 
-    Skeleton, 
-    useMantineColorScheme, 
-    Container, 
-    SimpleGrid,
-    Title,
-    ThemeIcon,
-    Box
+import {
+    Text, Group, Stack, Paper, Skeleton, useMantineColorScheme,
+    Container, SimpleGrid, Title, ThemeIcon, Box,
 } from "@mantine/core";
 import { IconInbox, IconClockPause, IconCircleCheck, IconAlertTriangle } from "@tabler/icons-react";
 
 import { fetchDashboard } from "../redux/operations/dashboardOperations";
 import { fetchAgents } from "../redux/operations/ticketOperations";
-
-const STATUS_COLOR = {
-    new: "#5B6B8C",
-    open: "#2F8F5B",
-    pending: "#C97A2B",
-    resolved: "#5B6B8C",
-    closed: "#7A828E",
-};
 
 // matches Mongo's $isoWeek (ISO-8601, Monday-start, week 1 contains the year's first Thursday)
 const isoWeek = (date) => {
@@ -50,56 +34,48 @@ const buildLastEightWeeks = (resolvedPerWeek) => {
     return weeks;
 };
 
-// --- Framer Motion Animation Variants ---
 const containerVariants = {
     hidden: { opacity: 0 },
-    show: {
-        opacity: 1,
-        transition: { staggerChildren: 0.1, delayChildren: 0.2 }
-    }
+    show: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
 };
-
 const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 300, damping: 24 } },
 };
 
-function StatCard({ icon: Icon, label, value, tone, isDark }) {
-    const toneColor = { default: "#5B6B8C", warn: "#e03131" }[tone] || "#5B6B8C";
-    const bg = isDark ? "#1A1D24" : "#FFFFFF";
-    const border = tone === "warn" && value > 0 ? toneColor : isDark ? "#2C2E33" : "#E9ECEF";
+function StatCard({ icon: Icon, label, value, tone, T }) {
+    const isWarn = tone === "warn" && value > 0;
+    const toneColor = isWarn ? T.urgent : T.ink;
 
     return (
         <motion.div variants={itemVariants} whileHover={{ y: -4 }} transition={{ type: "spring", stiffness: 400 }}>
             <Paper
-                withBorder
-                radius="lg"
                 p="lg"
-                shadow="sm"
                 style={{
-                    background: bg,
-                    borderColor: border,
+                    background: T.surface,
+                    border: `1px solid ${isWarn ? T.urgent : T.line}`,
+                    borderRadius: 10,
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
-                    justifyContent: "space-between"
+                    justifyContent: "space-between",
                 }}
             >
                 <Group justify="space-between" align="flex-start" mb="md">
-                    <Text size="sm" fw={600} c="dimmed" tt="uppercase" lts={1}>
-                        {label}
-                    </Text>
-                    <ThemeIcon 
-                        variant={tone === "warn" ? "light" : "default"} 
-                        color={tone === "warn" ? "red" : "gray"} 
-                        size="lg" 
+                    <Text size="xs" fw={700} c={T.inkMuted}>{label}</Text>
+                    <ThemeIcon
+                        variant="light"
+                        size="lg"
                         radius="md"
-                        style={{ border: isDark && tone !== "warn" ? '1px solid #2C2E33' : undefined }}
+                        style={{
+                            background: isWarn ? "rgba(179,64,29,0.12)" : T.accentTint,
+                            color: toneColor,
+                        }}
                     >
-                        <Icon size={20} color={tone === "warn" ? undefined : toneColor} />
+                        <Icon size={19} />
                     </ThemeIcon>
                 </Group>
-                <Text size="38px" fw={800} style={{ color: tone === "warn" && value > 0 ? toneColor : isDark ? "#FAFAF9" : "#0F1115", lineHeight: 1 }}>
+                <Text size="36px" fw={800} style={{ color: toneColor, lineHeight: 1 }}>
                     {value}
                 </Text>
             </Paper>
@@ -109,9 +85,28 @@ function StatCard({ icon: Icon, label, value, tone, isDark }) {
 
 function Dashboard() {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
     const { colorScheme } = useMantineColorScheme();
     const isDark = colorScheme === "dark";
+
+    // Same tokens as the rest of the app, plus the same status→color mapping
+    // used on the ticket page and homepage, so "pending" always means brass
+    // and "closed" always means brick, everywhere you see it.
+    const T = {
+        page: isDark ? "#101214" : "#F7F7F4",
+        surface: isDark ? "#17191C" : "#FFFFFF",
+        ink: isDark ? "#ECEDEE" : "#1B1D1F",
+        inkMuted: isDark ? "#9AA0A6" : "#6E7278",
+        inkFaint: isDark ? "#6B6F76" : "#9CA0A6",
+        line: isDark ? "#262A2E" : "#E6E4DD",
+        accent: isDark ? "#F4F4F3" : "#0E0F11",
+        accentTint: isDark ? "rgba(244,244,243,0.10)" : "rgba(14,15,17,0.05)",
+        urgent: "#B3401D",
+        note: "#8A6D1D",
+        good: "#2F5F3E",
+        track: isDark ? "#22252A" : "#EEEDE8",
+    };
+
+    const STATUS_COLOR = { new: T.inkFaint, open: T.accent, pending: T.note, resolved: T.good, closed: T.urgent };
 
     const { headline, byStatus, byAgent, resolvedPerWeek, loading } = useSelector((state) => state.dashboard);
     const { agents } = useSelector((state) => state.ticket);
@@ -131,78 +126,62 @@ function Dashboard() {
     const weeks = useMemo(() => buildLastEightWeeks(resolvedPerWeek), [resolvedPerWeek]);
     const maxWeekCount = Math.max(1, ...weeks.map((w) => w.count));
 
-    const cardBg = isDark ? "#1A1D24" : "#FFFFFF";
-    const pageBg = isDark ? "#0F1115" : "#F4F5F7";
-    const textPrimary = isDark ? "#FAFAF9" : "#0F1115";
-    const border = isDark ? "#2C2E33" : "#E9ECEF";
+    const cardStyle = { background: T.surface, border: `1px solid ${T.line}`, borderRadius: 10 };
 
     if (loading && byStatus.length === 0) {
         return (
-            <Container size="xl" pt={100} pb="xl">
-                <Skeleton height={40} width={200} mb="xl" radius="md" />
-                <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} mb="xl">
-                    <Skeleton height={140} radius="lg" />
-                    <Skeleton height={140} radius="lg" />
-                    <Skeleton height={140} radius="lg" />
-                    <Skeleton height={140} radius="lg" />
-                </SimpleGrid>
-                <Skeleton height={300} radius="lg" />
-            </Container>
+            <Box style={{ background: T.page, minHeight: "100vh" }}>
+                <Container size="xl" pt={100} pb="xl">
+                    <Skeleton height={36} width={180} mb="xl" radius="sm" />
+                    <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} mb="xl">
+                        <Skeleton height={130} radius="md" />
+                        <Skeleton height={130} radius="md" />
+                        <Skeleton height={130} radius="md" />
+                        <Skeleton height={130} radius="md" />
+                    </SimpleGrid>
+                    <Skeleton height={280} radius="md" />
+                </Container>
+            </Box>
         );
     }
 
     return (
-        <Box bg={pageBg} minHeight="100vh">
-            {/* The 'pt={100}' (padding-top) pushes the content down so it doesn't hide behind a fixed navbar.
-              Adjust this value based on your exact navbar height! 
-            */}
+        <Box style={{ background: T.page, minHeight: "100vh" }}>
+            {/* pt={100} clears a fixed navbar — adjust to your navbar's actual height */}
             <Container size="xl" pt={100} pb="xl">
-                
                 <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.5 }}>
-                    <Title order={1} mb="xs" style={{ color: textPrimary, letterSpacing: "-1px" }}>
-                        Overview
-                    </Title>
-                    <Text c="dimmed" mb="xl" size="sm">
-                        Track your ticketing performance and agent workloads.
-                    </Text>
+                    <Title order={1} mb={4} style={{ color: T.ink, letterSpacing: "-0.5px" }}>Overview</Title>
+                    <Text c={T.inkMuted} mb="xl" size="sm">Ticketing performance and agent workload, at a glance.</Text>
                 </motion.div>
 
                 <motion.div variants={containerVariants} initial="hidden" animate="show">
-                    
-                    {/* Top Stats */}
+                    {/* Headline stats */}
                     <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="lg" mb="xl">
-                        <StatCard icon={IconInbox} label="Open" value={headline.open} isDark={isDark} />
-                        <StatCard icon={IconClockPause} label="Pending (Customer)" value={headline.pending} isDark={isDark} />
-                        <StatCard icon={IconCircleCheck} label="Resolved (Weekly)" value={headline.resolvedThisWeek} isDark={isDark} />
-                        <StatCard icon={IconAlertTriangle} label="Breaching SLA" value={headline.breaching} tone="warn" isDark={isDark} />
+                        <StatCard icon={IconInbox} label="Open" value={headline.open} T={T} />
+                        <StatCard icon={IconClockPause} label="Pending on customer" value={headline.pending} T={T} />
+                        <StatCard icon={IconCircleCheck} label="Resolved this week" value={headline.resolvedThisWeek} T={T} />
+                        <StatCard icon={IconAlertTriangle} label="Breaching SLA" value={headline.breaching} tone="warn" T={T} />
                     </SimpleGrid>
 
-                    {/* Middle Section: Status & Agents */}
+                    {/* Status & agent breakdown */}
                     <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg" mb="xl">
-                        
                         <motion.div variants={itemVariants}>
-                            <Paper withBorder radius="lg" p="xl" shadow="sm" style={{ background: cardBg, borderColor: border, height: '100%' }}>
-                                <Text size="sm" fw={700} c="dimmed" tt="uppercase" lts={1} mb="lg">
-                                    Tickets by Status
-                                </Text>
+                            <Paper style={cardStyle} p="xl" h="100%">
+                                <Text size="xs" fw={700} c={T.inkMuted} mb="lg">Tickets by status</Text>
                                 <Stack gap={16}>
-                                    {byStatus.length === 0 && <Text size="sm" c="dimmed">No tickets yet.</Text>}
+                                    {byStatus.length === 0 && <Text size="sm" c={T.inkFaint}>No tickets yet.</Text>}
                                     {byStatus.map((s, index) => (
                                         <div key={s._id}>
                                             <Group justify="space-between" mb={6}>
-                                                <Text size="sm" fw={500} tt="capitalize" style={{ color: textPrimary }}>
-                                                    {s._id}
-                                                </Text>
-                                                <Text size="sm" fw={600} style={{ color: textPrimary }}>
-                                                    {s.count}
-                                                </Text>
+                                                <Text size="sm" fw={600} tt="capitalize" c={T.ink}>{s._id}</Text>
+                                                <Text size="sm" fw={700} c={T.ink}>{s.count}</Text>
                                             </Group>
-                                            <div style={{ height: 8, borderRadius: 4, background: isDark ? "#2A2D35" : "#F0F0EE", overflow: "hidden" }}>
+                                            <div style={{ height: 8, borderRadius: 4, background: T.track, overflow: "hidden" }}>
                                                 <motion.div
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${(s.count / maxStatusCount) * 100}%` }}
                                                     transition={{ duration: 0.8, delay: index * 0.1, ease: "easeOut" }}
-                                                    style={{ height: "100%", background: STATUS_COLOR[s._id] || "#5B6B8C", borderRadius: 4 }}
+                                                    style={{ height: "100%", background: STATUS_COLOR[s._id] || T.inkFaint, borderRadius: 4 }}
                                                 />
                                             </div>
                                         </div>
@@ -212,31 +191,25 @@ function Dashboard() {
                         </motion.div>
 
                         <motion.div variants={itemVariants}>
-                            <Paper withBorder radius="lg" p="xl" shadow="sm" style={{ background: cardBg, borderColor: border, height: '100%' }}>
-                                <Text size="sm" fw={700} c="dimmed" tt="uppercase" lts={1} mb="lg">
-                                    Tickets by Agent
-                                </Text>
+                            <Paper style={cardStyle} p="xl" h="100%">
+                                <Text size="xs" fw={700} c={T.inkMuted} mb="lg">Tickets by agent</Text>
                                 <Stack gap={16}>
-                                    {byAgent.length === 0 && <Text size="sm" c="dimmed">Nothing assigned yet.</Text>}
+                                    {byAgent.length === 0 && <Text size="sm" c={T.inkFaint}>Nothing assigned yet.</Text>}
                                     {byAgent
                                         .slice()
                                         .sort((a, b) => b.count - a.count)
                                         .map((a, index) => (
                                             <div key={a._id || "unassigned"}>
                                                 <Group justify="space-between" mb={6}>
-                                                    <Text size="sm" fw={500} style={{ color: textPrimary }}>
-                                                        {agentNameById(a._id)}
-                                                    </Text>
-                                                    <Text size="sm" fw={600} style={{ color: textPrimary }}>
-                                                        {a.count}
-                                                    </Text>
+                                                    <Text size="sm" fw={600} c={T.ink}>{agentNameById(a._id)}</Text>
+                                                    <Text size="sm" fw={700} c={T.ink}>{a.count}</Text>
                                                 </Group>
-                                                <div style={{ height: 8, borderRadius: 4, background: isDark ? "#2A2D35" : "#F0F0EE", overflow: "hidden" }}>
+                                                <div style={{ height: 8, borderRadius: 4, background: T.track, overflow: "hidden" }}>
                                                     <motion.div
                                                         initial={{ width: 0 }}
                                                         animate={{ width: `${(a.count / maxAgentCount) * 100}%` }}
                                                         transition={{ duration: 0.8, delay: index * 0.1, ease: "easeOut" }}
-                                                        style={{ height: "100%", background: a._id ? "#339AF0" : "#868E96", borderRadius: 4 }}
+                                                        style={{ height: "100%", background: a._id ? T.accent : T.inkFaint, borderRadius: 4 }}
                                                     />
                                                 </div>
                                             </div>
@@ -244,36 +217,29 @@ function Dashboard() {
                                 </Stack>
                             </Paper>
                         </motion.div>
-
                     </SimpleGrid>
 
-                    {/* Bottom Section: Bar Chart */}
+                    {/* Resolution velocity */}
                     <motion.div variants={itemVariants}>
-                        <Paper withBorder radius="lg" p="xl" shadow="sm" style={{ background: cardBg, borderColor: border }}>
-                            <Text size="sm" fw={700} c="dimmed" tt="uppercase" lts={1} mb="xl">
-                                Resolution Velocity (Last 8 Weeks)
-                            </Text>
-                            <Group align="flex-end" gap="md" style={{ height: 160, width: '100%' }} wrap="nowrap">
+                        <Paper style={cardStyle} p="xl">
+                            <Text size="xs" fw={700} c={T.inkMuted} mb="xl">Resolution velocity — last 8 weeks</Text>
+                            <Group align="flex-end" gap="md" style={{ height: 160, width: "100%" }} wrap="nowrap">
                                 {weeks.map((w, index) => (
                                     <div key={w.week} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: 1, height: "100%", justifyContent: "flex-end" }}>
-                                        <Text size="xs" fw={600} style={{ color: textPrimary }} mb={8}>
-                                            {w.count}
-                                        </Text>
+                                        <Text size="xs" fw={700} c={T.ink} mb={8}>{w.count}</Text>
                                         <motion.div
                                             initial={{ height: 0 }}
                                             animate={{ height: `${Math.max((w.count / maxWeekCount) * 100, w.count > 0 ? 8 : 4)}px` }}
-                                            transition={{ duration: 0.6, delay: 0.4 + (index * 0.05), type: "spring", bounce: 0.3 }}
+                                            transition={{ duration: 0.6, delay: 0.4 + index * 0.05, type: "spring", bounce: 0.3 }}
                                             style={{
                                                 width: "100%",
                                                 maxWidth: 40,
                                                 borderRadius: "6px 6px 0 0",
-                                                background: w.isCurrent 
-                                                    ? "linear-gradient(180deg, #339AF0 0%, #228BE6 100%)" 
-                                                    : isDark ? "#2C2E33" : "#E1E4EA",
+                                                background: w.isCurrent ? T.accent : T.track,
                                             }}
                                             whileHover={{ scaleY: 1.05, opacity: 0.9, originY: 1 }}
                                         />
-                                        <Text size="xs" c="dimmed" mt={12} fw={500}>
+                                        <Text size="xs" c={T.inkFaint} mt={12} fw={600}>
                                             {w.isCurrent ? "Current" : `W${w.week}`}
                                         </Text>
                                     </div>
@@ -281,7 +247,6 @@ function Dashboard() {
                             </Group>
                         </Paper>
                     </motion.div>
-                    
                 </motion.div>
             </Container>
         </Box>

@@ -16,11 +16,8 @@ import {
     Tabs,
     Avatar,
     Divider,
-    SegmentedControl,
     useMantineColorScheme,
     Skeleton,
-    Badge,
-    Tooltip,
     Box,
 } from "@mantine/core";
 import {
@@ -31,7 +28,6 @@ import {
     IconCheck,
     IconX,
     IconUserPlus,
-    IconLock,
     IconSend,
     IconClock,
     IconMessageCircle,
@@ -115,6 +111,25 @@ export default function TicketDetail() {
 
     const { colorScheme } = useMantineColorScheme();
     const isDark = colorScheme === "dark";
+
+    // Same monochrome system as the navbar and homepage: black/white accent
+    // instead of a brand blue, plus three semantic colors reserved for the
+    // things on this page that carry actual meaning.
+    const T = {
+        page: isDark ? "#101214" : "#F7F7F4",
+        surface: isDark ? "#17191C" : "#FFFFFF",
+        ink: isDark ? "#ECEDEE" : "#1B1D1F",
+        inkMuted: isDark ? "#9AA0A6" : "#6E7278",
+        inkFaint: isDark ? "#6B6F76" : "#9CA0A6",
+        line: isDark ? "#262A2E" : "#E6E4DD",
+        accent: isDark ? "#F4F4F3" : "#0E0F11",
+        accentInk: isDark ? "#0E0F11" : "#F4F4F3",
+        accentTint: isDark ? "rgba(244,244,243,0.10)" : "rgba(14,15,17,0.05)",
+        urgent: "#B3401D", // closing / archiving
+        note: "#8A6D1D", // internal-only
+        good: "#2F5F3E", // resolved / restored
+        mono: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+    };
 
     const { currentTicket: ticket, messages, timeline, agents, loading } = useSelector(
         (state) => state.ticket
@@ -251,480 +266,421 @@ export default function TicketDetail() {
 
     if (loading && !ticket) {
         return (
-            <Box style={{ maxWidth: 1200, margin: "0 auto" }} p="xl">
+            <Box style={{ maxWidth: 1200, margin: "0 auto", background: T.page, minHeight: "100vh" }} p="xl">
                 <Skeleton height={24} width={140} mb="xl" radius="sm" />
-                <Skeleton height={160} radius="lg" mb="md" />
-                <Skeleton height={350} radius="lg" />
+                <Skeleton height={140} radius="md" mb="md" />
+                <Skeleton height={350} radius="md" />
             </Box>
         );
     }
 
     if (!ticket) return null;
 
-    return (
-        <Box
-            style={{
-                maxWidth: 1200,
-                margin: "0 auto",
-                minHeight: "100vh",
-            }}
-            p={{ base: "md", sm: "xl" }}
-        >
-            {/* Top Navigation Bar */}
-            <Group justify="space-between" align="center" mb="lg">
-                <Button
-                    variant="subtle"
-                    color="gray"
-                    size="sm"
-                    leftSection={<IconArrowLeft size={16} />}
-                    onClick={() => navigate(-1)}
-                    style={{ borderRadius: "8px" }}
-                >
-                    Back to queue
-                </Button>
+    const shortId = String(id).slice(-6).toUpperCase();
 
-                <Button
-                    variant={ticket.archived ? "light" : "outline"}
-                    color={ticket.archived ? "teal" : "gray"}
-                    size="xs"
-                    radius="md"
-                    leftSection={ticket.archived ? <IconArchiveOff size={14} /> : <IconArchive size={14} />}
-                    onClick={handleArchiveToggle}
-                >
-                    {ticket.archived ? "Restore Ticket" : "Archive Ticket"}
-                </Button>
-            </Group>
-
-            {/* Layout Grid */}
+    // A small colored icon chip used as the header for every sidebar
+    // section, so each block reads as its own clearly-bounded thing.
+    const ChipHeader = ({ icon: Icon, label, color }) => (
+        <Group gap={8} mb={12}>
             <Box
                 style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr minmax(280px, 320px)",
-                    gap: "24px",
-                    alignItems: "start",
+                    width: 26, height: 26, borderRadius: 7,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: color, color: "#fff", flexShrink: 0,
                 }}
             >
-                {/* Main Content Pane */}
-                <Stack gap="lg">
-                    {/* Ticket Overview Card */}
-                    <Paper
-                        withBorder
-                        radius="lg"
-                        style={{
-                            overflow: "hidden",
-                            borderColor: isDark ? "var(--mantine-color-dark-4)" : "var(--mantine-color-gray-2)",
-                            boxShadow: isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.05)",
-                        }}
+                <Icon size={14} />
+            </Box>
+            <Text size="sm" fw={700} c={T.ink}>{label}</Text>
+        </Group>
+    );
+
+    const cardStyle = {
+        background: T.surface,
+        border: `1px solid ${T.line}`,
+        borderRadius: 10,
+    };
+
+    return (
+        <Box style={{ background: T.page, minHeight: "100vh" }}>
+            <Box style={{ maxWidth: 1200, margin: "0 auto" }} p={{ base: "md", sm: "xl" }}>
+                {/* Top bar */}
+                <Group justify="space-between" align="center" mb="lg">
+                    <Group gap={8} onClick={() => navigate(-1)} style={{ cursor: "pointer" }}>
+                        <IconArrowLeft size={16} color={T.inkMuted} />
+                        <Text size="sm" fw={600} c={T.inkMuted}>Back to queue</Text>
+                        <Text size="sm" c={T.inkFaint}>·</Text>
+                    </Group>
+
+                    <Button
+                        variant={ticket.archived ? "light" : "default"}
+                        color={ticket.archived ? "teal" : "gray"}
+                        size="xs"
+                        radius="sm"
+                        leftSection={ticket.archived ? <IconArchiveOff size={14} /> : <IconArchive size={14} />}
+                        onClick={handleArchiveToggle}
                     >
-                        <Box style={{ display: "flex", minHeight: "100%" }}>
-                            <PriorityBar priority={ticket.priority} />
-                            <Box style={{ flex: 1 }} p="lg">
-                                <Group justify="space-between" align="flex-start" mb="xs">
+                        {ticket.archived ? "Restore ticket" : "Archive ticket"}
+                    </Button>
+                </Group>
+
+                {/* Layout grid */}
+                <Box
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr minmax(300px, 340px)",
+                        gap: 24,
+                        alignItems: "start",
+                    }}
+                >
+                    {/* Main column */}
+                    <Stack gap="lg">
+                        {/* Overview block */}
+                        <Paper style={cardStyle}>
+                            <Box style={{ display: "flex" }}>
+                                <Box style={{ width: 5, borderRadius: "10px 0 0 10px", overflow: "hidden" }}>
+                                    <PriorityBar priority={ticket.priority} />
+                                </Box>
+                                <Box style={{ flex: 1 }} p="lg">
+                                    <Group justify="space-between" align="flex-start" mb={8} wrap="nowrap" gap="md">
+                                        {editingFields ? (
+                                            <TextInput
+                                                value={draft.subject}
+                                                onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
+                                                style={{ flex: 1 }}
+                                                size="md"
+                                                radius="sm"
+                                                styles={{ input: { fontSize: 20, fontWeight: 700 } }}
+                                            />
+                                        ) : (
+                                            <Text size="24px" fw={700} c={T.ink} style={{ lineHeight: 1.3 }}>
+                                                {ticket.subject}
+                                            </Text>
+                                        )}
+
+                                        <Group gap={8} wrap="nowrap">
+                                            <StatusPill status={ticket.status} />
+                                            {editingFields ? (
+                                                <Group gap={4}>
+                                                    <ActionIcon size="sm" variant="light" color="teal" radius="sm" onClick={handleSaveFields} aria-label="Save changes">
+                                                        <IconCheck size={14} />
+                                                    </ActionIcon>
+                                                    <ActionIcon
+                                                        size="sm" variant="light" color="gray" radius="sm"
+                                                        aria-label="Discard changes"
+                                                        onClick={() => {
+                                                            setEditingFields(false);
+                                                            setDraft({ subject: ticket.subject, description: ticket.description });
+                                                        }}
+                                                    >
+                                                        <IconX size={14} />
+                                                    </ActionIcon>
+                                                </Group>
+                                            ) : (
+                                                <ActionIcon size="sm" variant="subtle" color="gray" radius="sm" aria-label="Edit ticket" onClick={() => setEditingFields(true)}>
+                                                    <IconPencil size={14} />
+                                                </ActionIcon>
+                                            )}
+                                        </Group>
+                                    </Group>
+
                                     {editingFields ? (
-                                        <TextInput
-                                            value={draft.subject}
-                                            onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
-                                            style={{ flex: 1 }}
-                                            size="sm"
-                                            variant="filled"
-                                            radius="md"
+                                        <Textarea
+                                            value={draft.description}
+                                            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                                            autosize
+                                            minRows={3}
+                                            radius="sm"
+                                            mt={8}
                                         />
                                     ) : (
-                                        <Text size="xl" fw={700} style={{ lineHeight: 1.3 }}>
-                                            {ticket.subject}
+                                        <Text size="sm" c={T.inkMuted} style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }} mt={8}>
+                                            {ticket.description}
                                         </Text>
                                     )}
 
-                                    <Group gap="xs" wrap="nowrap">
-                                        <StatusPill status={ticket.status} />
-                                        {editingFields ? (
-                                            <Group gap={4}>
-                                                <ActionIcon size="sm" variant="light" color="teal" radius="md" onClick={handleSaveFields}>
-                                                    <IconCheck size={14} />
-                                                </ActionIcon>
-                                                <ActionIcon
-                                                    size="sm"
-                                                    variant="light"
-                                                    color="gray"
-                                                    radius="md"
-                                                    onClick={() => {
-                                                        setEditingFields(false);
-                                                        setDraft({ subject: ticket.subject, description: ticket.description });
-                                                    }}
-                                                >
-                                                    <IconX size={14} />
-                                                </ActionIcon>
-                                            </Group>
+                                    <Group gap="md" mt="md" pt="sm" style={{ borderTop: `1px solid ${T.line}` }}>
+                                        <Group gap={8}>
+                                            <Avatar size="sm" radius="xl" color="dark">
+                                                {ticket.requester?.name?.charAt(0)?.toUpperCase()}
+                                            </Avatar>
+                                            <Text size="sm" fw={600} c={T.ink}>{ticket.requester?.name}</Text>
+                                            <Text size="xs" c={T.inkFaint}>{ticket.requester?.email}</Text>
+                                        </Group>
+                                        <Box
+                                            style={{
+                                                fontSize: 12, fontWeight: 600, color: T.inkMuted,
+                                                border: `1px solid ${T.line}`, borderRadius: 20, padding: "2px 10px",
+                                                textTransform: "capitalize",
+                                            }}
+                                        >
+                                            {ticket.category}
+                                        </Box>
+                                    </Group>
+                                </Box>
+                            </Box>
+                        </Paper>
+
+                        {/* Conversation / History block */}
+                        <Paper style={cardStyle}>
+                        <Tabs
+    value={activeTab}
+    onChange={setActiveTab}
+    variant="pills"
+    styles={{
+        root: {
+            "--tabs-color": T.accent,
+            "--tabs-text-color": T.accentInk,
+        },
+        list: { padding: "12px 16px 0", gap: 4 },
+        tab: {
+            fontSize: 13,
+            fontWeight: 600,
+            color: T.inkMuted,
+        },
+    }}
+>
+                                <Tabs.List>
+                                    <Tabs.Tab value="conversation" leftSection={<IconMessageCircle size={15} />}>Conversation</Tabs.Tab>
+                                    <Tabs.Tab value="history" leftSection={<IconHistory size={15} />}>History</Tabs.Tab>
+                                </Tabs.List>
+
+                                <Tabs.Panel value="conversation" p="lg">
+                                    <Stack gap={14} mb="lg">
+                                        {messages.length === 0 ? (
+                                            <Text size="sm" c={T.inkFaint} ta="center" py="xl">
+                                                No replies yet. Start the conversation below.
+                                            </Text>
                                         ) : (
-                                            <ActionIcon size="sm" variant="subtle" color="gray" radius="md" onClick={() => setEditingFields(true)}>
-                                                <IconPencil size={14} />
+                                            messages.map((m) => {
+                                                const isInternal = m.type === "internal_note";
+                                                const barColor = isInternal ? T.note : T.accent;
+                                                return (
+                                                    <Box
+                                                        key={m._id}
+                                                        p="md"
+                                                        style={{
+                                                            background: isInternal ? (isDark ? "rgba(138,109,29,0.10)" : "#FBF7EC") : (isDark ? "#1D2024" : "#F7F7F5"),
+                                                            border: `1px solid ${T.line}`,
+                                                            borderLeft: `3px solid ${barColor}`,
+                                                            borderRadius: 8,
+                                                        }}
+                                                    >
+                                                        <Group justify="space-between" mb={6}>
+                                                            <Group gap={8}>
+                                                                <Avatar size={22} radius="xl" color={isInternal ? "yellow" : "dark"}>
+                                                                    {m.author?.name?.charAt(0)?.toUpperCase()}
+                                                                </Avatar>
+                                                                <Text size="sm" fw={700} c={T.ink}>{m.author?.name}</Text>
+                                                                {isInternal && (
+                                                                    <Text size="xs" fw={700} c={T.note}>Internal note</Text>
+                                                                )}
+                                                            </Group>
+                                                            <Text size="xs" c={T.inkFaint} style={{ fontFamily: T.mono }}>
+                                                                {new Date(m.createdAt).toLocaleString()}
+                                                            </Text>
+                                                        </Group>
+                                                        <Text size="sm" c={T.ink} style={{ whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
+                                                            {m.body}
+                                                        </Text>
+                                                    </Box>
+                                                );
+                                            })
+                                        )}
+                                    </Stack>
+
+                                    <Divider color={T.line} mb="md" />
+
+                                    <Stack gap={10}>
+                                        <Group gap={8}>
+                                            {[
+                                                { key: "reply", label: "Reply to customer" },
+                                                { key: "internal_note", label: "Internal note" },
+                                            ].map((opt) => {
+                                                const active = replyKind === opt.key;
+                                                const color = opt.key === "internal_note" ? T.note : T.accent;
+                                                return (
+                                                    <Box
+                                                        key={opt.key}
+                                                        onClick={() => setReplyKind(opt.key)}
+                                                        style={{
+                                                            cursor: "pointer", fontSize: 12, fontWeight: 700,
+                                                            padding: "6px 12px", borderRadius: 20,
+                                                            border: `1px solid ${active ? color : T.line}`,
+                                                            color: active ? "#fff" : T.inkMuted,
+                                                            background: active ? color : "transparent",
+                                                            transition: "all .15s ease",
+                                                        }}
+                                                    >
+                                                        {opt.label}
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Group>
+                                        <Textarea
+                                            placeholder={replyKind === "reply" ? "Write a reply the customer will see…" : "Leave a note for the team — the customer won't see this…"}
+                                            value={replyBody}
+                                            onChange={(e) => setReplyBody(e.target.value)}
+                                            autosize
+                                            minRows={3}
+                                            radius="sm"
+                                        />
+                                        <Group justify="flex-end">
+                                            <Button
+                                                size="sm"
+                                                radius="sm"
+                                                loading={submittingReply}
+                                                onClick={handleSendReply}
+                                                disabled={!replyBody.trim()}
+                                                color={replyKind === "internal_note" ? "yellow" : "dark"}
+                                                rightSection={<IconSend size={13} />}
+                                            >
+                                                {replyKind === "reply" ? "Send reply" : "Add note"}
+                                            </Button>
+                                        </Group>
+                                    </Stack>
+                                </Tabs.Panel>
+
+                                <Tabs.Panel value="history" p="lg">
+                                    <Stack gap={16}>
+                                        {timeline.length === 0 ? (
+                                            <Text size="sm" c={T.inkFaint} ta="center" py="xl">
+                                                No activity recorded yet.
+                                            </Text>
+                                        ) : (
+                                            timeline.map((event) => (
+                                                <Group key={event._id} gap={12} align="flex-start" wrap="nowrap">
+                                                    <Box style={{ width: 7, height: 7, borderRadius: "50%", background: T.accent, marginTop: 7, flexShrink: 0 }} />
+                                                    <Box>
+                                                        <Text size="sm" c={T.ink} style={{ lineHeight: 1.4 }}>{TIMELINE_LABEL(event)}</Text>
+                                                        <Text size="xs" c={T.inkFaint} style={{ fontFamily: T.mono }}>
+                                                            {new Date(event.createdAt).toLocaleString()}
+                                                        </Text>
+                                                    </Box>
+                                                </Group>
+                                            ))
+                                        )}
+                                    </Stack>
+                                </Tabs.Panel>
+                            </Tabs>
+                        </Paper>
+                    </Stack>
+
+                    {/* Sidebar — each functionality its own clearly bounded card */}
+                    <Stack gap="md" style={{ position: "sticky", top: 20 }}>
+                        <Paper style={cardStyle} p="lg">
+                            <ChipHeader icon={IconClock} label="Response time" color={T.accent} />
+                            <SlaTimer ticket={ticket} />
+                            <Text size="xs" c={T.inkFaint} mt={8} style={{ fontFamily: T.mono }}>
+                                target {ticket.slaTargetMinutes}m
+                            </Text>
+
+                            {availableTransitions.length > 0 && (
+                                <>
+                                    <Divider color={T.line} my="md" />
+                                    <Stack gap={8}>
+                                        {availableTransitions.map((target) => {
+                                            const closing = target === "closed";
+                                            return (
+                                                <Button
+                                                    key={target}
+                                                    size="sm"
+                                                    radius="sm"
+                                                    variant={closing ? "filled" : "default"}
+                                                    color={closing ? "red" : "dark"}
+                                                    onClick={() => handleTransition(target)}
+                                                    fullWidth
+                                                >
+                                                    {ACTION_LABEL[`${ticket.status}>${target}`] || `Move to ${target}`}
+                                                </Button>
+                                            );
+                                        })}
+                                    </Stack>
+                                </>
+                            )}
+                        </Paper>
+
+                        <Paper style={cardStyle} p="lg">
+                            <ChipHeader icon={IconUserCheck} label="Assignee" color={T.accent} />
+                            <Group gap={8}>
+                                <Avatar size={30} radius="xl" color="dark">
+                                    {ticket.primaryAssignee?.name?.charAt(0)?.toUpperCase() || "?"}
+                                </Avatar>
+                                <Text size="sm" fw={600} c={T.ink}>
+                                    {ticket.primaryAssignee?.name || "Unassigned"}
+                                </Text>
+                            </Group>
+
+                            {canReassign && (
+                                <Group gap={8} wrap="nowrap" mt="md">
+                                    <Select
+                                        placeholder="Reassign to…"
+                                        data={reassignOptions}
+                                        value={reassignTarget}
+                                        onChange={setReassignTarget}
+                                        size="sm"
+                                        radius="sm"
+                                        style={{ flex: 1 }}
+                                        searchable
+                                    />
+                                    <Button size="sm" radius="sm" variant="default" onClick={handleReassign} disabled={!reassignTarget}>
+                                        Move
+                                    </Button>
+                                </Group>
+                            )}
+                        </Paper>
+
+                        <Paper style={cardStyle} p="lg">
+                            <ChipHeader icon={IconUsersGroup} label="Collaborators" color={T.accent} />
+                            <Stack gap={10} mb={canManageCollaborators ? "md" : 0}>
+                                {(ticket.collaborators || []).length === 0 && (
+                                    <Text size="sm" c={T.inkFaint}>No collaborators attached.</Text>
+                                )}
+                                {(ticket.collaborators || []).map((c) => (
+                                    <Group key={c._id} justify="space-between">
+                                        <Group gap={8}>
+                                            <Avatar size={22} radius="xl" color="gray">
+                                                {c.name?.charAt(0)?.toUpperCase()}
+                                            </Avatar>
+                                            <Text size="sm" c={T.ink}>{c.name}</Text>
+                                        </Group>
+                                        {canManageCollaborators && (
+                                            <ActionIcon size="sm" variant="subtle" color="red" radius="sm" aria-label={`Remove ${c.name}`} onClick={() => handleRemoveCollaborator(c._id)}>
+                                                <IconX size={13} />
                                             </ActionIcon>
                                         )}
                                     </Group>
-                                </Group>
+                                ))}
+                            </Stack>
 
-                                {editingFields ? (
-                                    <Textarea
-                                        value={draft.description}
-                                        onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-                                        autosize
-                                        minRows={3}
-                                        variant="filled"
-                                        radius="md"
-                                        mt="xs"
-                                    />
-                                ) : (
-                                    <Text size="sm" c="dimmed" style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }} mt="xs">
-                                        {ticket.description}
-                                    </Text>
-                                )}
-
-                                <Group gap="md" mt="md" pt="sm" style={{ borderTop: `1px solid ${isDark ? "var(--mantine-color-dark-5)" : "var(--mantine-color-gray-1)"}` }}>
-                                    <Group gap="xs">
-                                        <Avatar size="xs" radius="xl" color="blue">
-                                            {ticket.requester?.name?.charAt(0)?.toUpperCase()}
-                                        </Avatar>
-                                        <Text size="xs" fw={500}>
-                                            {ticket.requester?.name}
-                                        </Text>
-                                        <Text size="xs" c="dimmed">
-                                            ({ticket.requester?.email})
-                                        </Text>
-                                    </Group>
-                                    <Badge variant="dot" size="sm" color="gray" tt="capitalize">
-                                        {ticket.category}
-                                    </Badge>
-                                </Group>
-                            </Box>
-                        </Box>
-                    </Paper>
-
-                    {/* Tabs Area: Conversation and History */}
-                    <Paper
-                        withBorder
-                        radius="lg"
-                        style={{
-                            borderColor: isDark ? "var(--mantine-color-dark-4)" : "var(--mantine-color-gray-2)",
-                            boxShadow: isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.05)",
-                        }}
-                    >
-                        <Tabs value={activeTab} onChange={setActiveTab} radius="md">
-                            <Tabs.List p="xs">
-                                <Tabs.Tab value="conversation" leftSection={<IconMessageCircle size={15} />}>
-                                    Conversation
-                                </Tabs.Tab>
-                                <Tabs.Tab value="history" leftSection={<IconHistory size={15} />}>
-                                    History
-                                </Tabs.Tab>
-                            </Tabs.List>
-
-                            <Tabs.Panel value="conversation" p="md">
-                                <Stack gap="md" mb="xl">
-                                    {messages.length === 0 ? (
-                                        <Text size="sm" c="dimmed" ta="center" py="xl">
-                                            No replies yet. Start the conversation below.
-                                        </Text>
-                                    ) : (
-                                        messages.map((m) => {
-                                            const isInternal = m.type === "internal_note";
-                                            return (
-                                                <Paper
-                                                    key={m._id}
-                                                    p="md"
-                                                    radius="md"
-                                                    style={{
-                                                        backgroundColor: isInternal
-                                                            ? isDark
-                                                                ? "rgba(201, 162, 39, 0.08)"
-                                                                : "#FFFDF5"
-                                                            : isDark
-                                                            ? "var(--mantine-color-dark-6)"
-                                                            : "var(--mantine-color-gray-0)",
-                                                        border: `1px solid ${
-                                                            isInternal
-                                                                ? isDark
-                                                                    ? "rgba(201, 162, 39, 0.3)"
-                                                                    : "#F3E8B6"
-                                                                : isDark
-                                                                ? "var(--mantine-color-dark-4)"
-                                                                : "var(--mantine-color-gray-2)"
-                                                        }`,
-                                                        borderLeftWidth: "4px",
-                                                        borderLeftColor: isInternal ? "var(--mantine-color-yellow-6)" : "var(--mantine-color-blue-6)",
-                                                    }}
-                                                >
-                                                    <Group justify="space-between" mb="xs">
-                                                        <Group gap="xs">
-                                                            <Avatar size={22} radius="xl" color={isInternal ? "yellow" : "blue"}>
-                                                                {m.author?.name?.charAt(0)?.toUpperCase()}
-                                                            </Avatar>
-                                                            <Text size="xs" fw={600}>
-                                                                {m.author?.name}
-                                                            </Text>
-                                                            {isInternal && (
-                                                                <Badge size="xs" variant="light" color="yellow" leftSection={<IconLock size={10} />}>
-                                                                    Internal Note
-                                                                </Badge>
-                                                            )}
-                                                        </Group>
-                                                        <Text size="10px" c="dimmed">
-                                                            {new Date(m.createdAt).toLocaleString()}
-                                                        </Text>
-                                                    </Group>
-                                                    <Text size="sm" style={{ whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-                                                        {m.body}
-                                                    </Text>
-                                                </Paper>
-                                            );
-                                        })
-                                    )}
-                                </Stack>
-
-                                <Divider mb="md" />
-
-                                {/* Reply Input Area */}
-                                <Stack gap="xs">
-                                    <SegmentedControl
-                                        size="xs"
-                                        radius="md"
-                                        value={replyKind}
-                                        onChange={setReplyKind}
-                                        data={[
-                                            { label: "Customer-visible reply", value: "reply" },
-                                            { label: "Internal note", value: "internal_note" },
-                                        ]}
-                                        style={{ alignSelf: "flex-start" }}
-                                    />
-                                    <Textarea
-                                        placeholder={
-                                            replyKind === "reply" ? "Write a reply the customer will see…" : "Leave an internal note for the team…"
-                                        }
-                                        value={replyBody}
-                                        onChange={(e) => setReplyBody(e.target.value)}
-                                        autosize
-                                        minRows={3}
-                                        radius="md"
-                                    />
-                                    <Group justify="flex-end">
-                                        <Button
-                                            size="xs"
-                                            radius="md"
-                                            loading={submittingReply}
-                                            onClick={handleSendReply}
-                                            disabled={!replyBody.trim()}
-                                            color={replyKind === "internal_note" ? "yellow" : "blue"}
-                                            rightSection={<IconSend size={12} />}
-                                        >
-                                            {replyKind === "reply" ? "Send Reply" : "Add Note"}
-                                        </Button>
-                                    </Group>
-                                </Stack>
-                            </Tabs.Panel>
-
-                            <Tabs.Panel value="history" p="md">
-                                <Stack gap="sm">
-                                    {timeline.length === 0 ? (
-                                        <Text size="sm" c="dimmed" ta="center" py="xl">
-                                            No activity recorded yet.
-                                        </Text>
-                                    ) : (
-                                        timeline.map((event) => (
-                                            <Group key={event._id} gap="xs" align="flex-start" wrap="nowrap">
-                                                <Box
-                                                    style={{
-                                                        width: 8,
-                                                        height: 8,
-                                                        borderRadius: "50%",
-                                                        backgroundColor: "var(--mantine-color-blue-5)",
-                                                        marginTop: 6,
-                                                        flexShrink: 0,
-                                                    }}
-                                                />
-                                                <Box>
-                                                    <Text size="sm" style={{ lineHeight: 1.4 }}>
-                                                        {TIMELINE_LABEL(event)}
-                                                    </Text>
-                                                    <Text size="10px" c="dimmed">
-                                                        {new Date(event.createdAt).toLocaleString()}
-                                                    </Text>
-                                                </Box>
-                                            </Group>
-                                        ))
-                                    )}
-                                </Stack>
-                            </Tabs.Panel>
-                        </Tabs>
-                    </Paper>
-                </Stack>
-
-                {/* Control Sidebar */}
-                <Stack gap="lg" style={{ position: "sticky", top: 20 }}>
-                    {/* SLA & Actions Section */}
-                    <Paper
-                        withBorder
-                        radius="lg"
-                        p="md"
-                        style={{
-                            borderColor: isDark ? "var(--mantine-color-dark-4)" : "var(--mantine-color-gray-2)",
-                            boxShadow: isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.05)",
-                        }}
-                    >
-                        <Group justify="space-between" mb="xs">
-                            <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-                                SLA Management
-                            </Text>
-                            <IconClock size={14} opacity={0.5} />
-                        </Group>
-
-                        <SlaTimer ticket={ticket} />
-
-                        <Text size="xs" c="dimmed" mt={6}>
-                            Target: {ticket.slaTargetMinutes} min response time
-                        </Text>
-
-                        {availableTransitions.length > 0 && (
-                            <>
-                                <Divider my="sm" />
-                                <Stack gap="xs">
-                                    {availableTransitions.map((target) => (
-                                        <Button
-                                            key={target}
-                                            size="xs"
-                                            radius="md"
-                                            variant={target === "closed" ? "filled" : "light"}
-                                            color={target === "closed" ? "red" : "blue"}
-                                            onClick={() => handleTransition(target)}
-                                            fullWidth
-                                        >
-                                            {ACTION_LABEL[`${ticket.status}>${target}`] || `Move to ${target}`}
-                                        </Button>
-                                    ))}
-                                </Stack>
-                            </>
-                        )}
-                    </Paper>
-
-                    {/* Assignment Section */}
-                    <Paper
-                        withBorder
-                        radius="lg"
-                        p="md"
-                        style={{
-                            borderColor: isDark ? "var(--mantine-color-dark-4)" : "var(--mantine-color-gray-2)",
-                            boxShadow: isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.05)",
-                        }}
-                    >
-                        <Group justify="space-between" mb="xs">
-                            <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-                                Primary Assignee
-                            </Text>
-                            <IconUserCheck size={14} opacity={0.5} />
-                        </Group>
-
-                        <Group gap="xs" mb={canReassign ? "xs" : 0}>
-                            <Avatar size={24} radius="xl" color="blue">
-                                {ticket.primaryAssignee?.name?.charAt(0)?.toUpperCase() || "?"}
-                            </Avatar>
-                            <Text size="sm" fw={500}>
-                                {ticket.primaryAssignee?.name || "Unassigned"}
-                            </Text>
-                        </Group>
-
-                        {canReassign && (
-                            <Group gap="xs" wrap="nowrap" mt="xs">
-                                <Select
-                                    placeholder="Reassign to…"
-                                    data={reassignOptions}
-                                    value={reassignTarget}
-                                    onChange={setReassignTarget}
-                                    size="xs"
-                                    radius="md"
-                                    style={{ flex: 1 }}
-                                    searchable
-                                />
-                                <Button size="xs" radius="md" onClick={handleReassign} disabled={!reassignTarget}>
-                                    Move
-                                </Button>
-                            </Group>
-                        )}
-                    </Paper>
-
-                    {/* Collaborators Section */}
-                    <Paper
-                        withBorder
-                        radius="lg"
-                        p="md"
-                        style={{
-                            borderColor: isDark ? "var(--mantine-color-dark-4)" : "var(--mantine-color-gray-2)",
-                            boxShadow: isDark ? "none" : "0 1px 3px rgba(0, 0, 0, 0.05)",
-                        }}
-                    >
-                        <Group justify="space-between" mb="xs">
-                            <Text size="xs" fw={700} tt="uppercase" c="dimmed">
-                                Collaborators
-                            </Text>
-                            <IconUsersGroup size={14} opacity={0.5} />
-                        </Group>
-
-                        <Stack gap="xs" mb={canManageCollaborators ? "xs" : 0}>
-                            {(ticket.collaborators || []).length === 0 && (
-                                <Text size="xs" c="dimmed">
-                                    No collaborators attached.
-                                </Text>
-                            )}
-                            {(ticket.collaborators || []).map((c) => (
-                                <Group key={c._id} justify="space-between">
-                                    <Group gap="xs">
-                                        <Avatar size={20} radius="xl" color="gray">
-                                            {c.name?.charAt(0)?.toUpperCase()}
-                                        </Avatar>
-                                        <Text size="xs" fw={500}>
-                                            {c.name}
-                                        </Text>
-                                    </Group>
-                                    {canManageCollaborators && (
-                                        <ActionIcon
-                                            size="xs"
-                                            variant="subtle"
-                                            color="red"
-                                            radius="md"
-                                            onClick={() => handleRemoveCollaborator(c._id)}
-                                        >
-                                            <IconX size={12} />
-                                        </ActionIcon>
-                                    )}
-                                </Group>
-                            ))}
-                        </Stack>
-
-                        {canManageCollaborators && (
-                            <Group gap="xs" wrap="nowrap" mt="xs">
-                                <Select
-                                    placeholder="Add collaborator…"
-                                    data={collaboratorOptions}
-                                    value={collaboratorTarget}
-                                    onChange={setCollaboratorTarget}
-                                    size="xs"
-                                    radius="md"
-                                    style={{ flex: 1 }}
-                                    searchable
-                                />
-                                <Tooltip label="Add Collaborator">
-                                    <ActionIcon
+                            {canManageCollaborators && (
+                                <Group gap={8} wrap="nowrap">
+                                    <Select
+                                        placeholder="Add collaborator…"
+                                        data={collaboratorOptions}
+                                        value={collaboratorTarget}
+                                        onChange={setCollaboratorTarget}
                                         size="sm"
+                                        radius="sm"
+                                        style={{ flex: 1 }}
+                                        searchable
+                                    />
+                                    <ActionIcon
+                                        size="lg"
                                         variant="filled"
-                                        color="blue"
-                                        radius="md"
+                                        color="dark"
+                                        radius="sm"
+                                        aria-label="Add collaborator"
                                         onClick={handleAddCollaborator}
                                         disabled={!collaboratorTarget}
                                     >
-                                        <IconUserPlus size={14} />
+                                        <IconUserPlus size={15} />
                                     </ActionIcon>
-                                </Tooltip>
-                            </Group>
-                        )}
-                    </Paper>
-                </Stack>
+                                </Group>
+                            )}
+                        </Paper>
+                    </Stack>
+                </Box>
             </Box>
         </Box>
     );

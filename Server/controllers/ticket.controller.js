@@ -151,7 +151,6 @@ export const updateTicket = async (req, res) => {
         return res.status(500).json({ success: false, message: 'failed to update ticket', error: error.message });
     }
 };
-
 export const archiveTicket = async (req, res) => {
     try {
         const ticket = req.ticket;
@@ -162,6 +161,12 @@ export const archiveTicket = async (req, res) => {
         await ArchiveEvent.create({ ticket: ticket._id, actor: req.user._id });
         ticket.archivedAt = new Date();
         await ticket.save();
+
+        await ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
         return res.status(200).json({ success: true, ticket });
     } catch (error) {
        return res.status(500).json({ success: false, message: 'Failed to archive ticket', error: error.message });
@@ -178,12 +183,38 @@ export const restoreTicket = async (req, res) => {
         await RestoreEvent.create({ ticket: ticket._id, actor: req.user._id });
         ticket.archivedAt = null;
         await ticket.save();
+
+        await ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
         return res.status(200).json({ success: true, ticket });
     } catch (error) {
        return res.status(500).json({ success: false, message: 'Failed to restore ticket', error: error.message });
     }
 };
 
+export const updateTicketStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        if (!status) {
+            return res.status(400).json({ success: false, message: 'status is required' });
+        }
+        await changeStatus(req.ticket, status, req.user);
+        await req.ticket.save();
+
+        await req.ticket.populate([
+            { path: "primaryAssignee", select: "name email" },
+            { path: "collaborators", select: "name email" },
+        ]);
+
+        return res.status(200).json({ success: true, ticket: req.ticket });
+    } catch (error) {
+        console.log(error);
+        return res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+};
 export const reassignTicket = async (req, res) => {
     try {
         const ticket = req.ticket;
@@ -227,21 +258,7 @@ export const reassignTicket = async (req, res) => {
     }
 };
 
-export const updateTicketStatus = async (req, res) => {
-    try {
-        const { status } = req.body;
-        if (!status) {
-            return res.status(400).json({ success: false, message: 'status is required' });
-        }
-        await changeStatus(req.ticket, status, req.user);
-        await req.ticket.save();
-        
-        return res.status(200).json({ success: true, ticket: req.ticket });
-    } catch (error) {
-        console.log(error);
-        return res.status(error.status || 500).json({ success: false, message: error.message });
-    }
-};
+ 
 
 export const addCollaborator = async (req, res) => {
     try {
