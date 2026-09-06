@@ -1,454 +1,169 @@
-# ResolveHQ Database Schema
+# Schema — ResolveHQ
 
-## 1. Database Choice
+## Every table's columns and types
 
-ResolveHQ uses:
+### User
+| Field | Type | Notes |
+|---|---|---|
+| `name` | String, required | |
+| `email` | String, required, unique | lowercased/trimmed before save |
+| `hashpassword` | String, required | bcrypt hash, `select: false` — never returned unless explicitly requested |
+| `role` | String enum: `agent`, `supervisor` | defaults to `agent`; never settable from public signup |
+| `createdAt` / `updatedAt` | Date | automatic (timestamps) |
 
-```text
-MongoDB
-+
-Mongoose
-```
+### Ticket
+| Field | Type | Notes |
+|---|---|---|
+| `subject` | String, required | |
+| `description` | String, required | |
+| `requester` | Embedded object `{ name, email }`, required | not a reference — see denormalization below |
+| `priority` | String enum: `low`, `medium`, `high`, `urgent`, required | |
+| `category` | String enum: `billing`, `technical`, `account`, `general`, required | |
+| `status` | String enum: `new`, `open`, `pending`, `resolved`, `closed` | defaults to `new` |
+| `primaryAssignee` | ObjectId → User, default `null` | optional — a ticket can be unassigned |
+| `collaborators` | [ObjectId → User] | zero or more |
+| `archived` / `archivedAt` | Boolean / Date | soft-hide from default queue views, never a delete |
+| `slaTargetMinutes` | Number, required | copied from priority **at creation time** — see denormalization |
+| `clock.accumulatedMs` | Number, default 0 | time already banked before the current running period |
+| `clock.runningSince` | Date, default `null` | `null` while paused (Pending/Resolved/Closed); a timestamp while running (New/Open) |
+| `resolvedAt` | Date, default `null` | cleared if the ticket leaves Resolved again |
+| `closedAt` | Date, default `null` | used to enforce the reopen window |
+| `createdAt` / `updatedAt` | Date | automatic |
 
-The database design is centered around the Ticket entity and the internal User entity.
+### Message
+| Field | Type | Notes |
+|---|---|---|
+| `ticket` | ObjectId → Ticket, required | |
+| `author` | ObjectId → User, required | |
+| `body` | String, required | |
+| `type` | String enum: `reply`, `internal_note`, required | `reply` = customer-visible |
+| `createdAt` | Date | automatic; no `updatedAt` — messages aren't edited |
 
-The current implementation intentionally keeps the schema simple and avoids premature optimization.
+### TimelineEvent (base) + 9 discriminators
+| Field (base) | Type | Notes |
+|---|---|---|
+| `ticket` | ObjectId → Ticket, required | |
+| `actor` | ObjectId → User, required | |
+| `type` | discriminator key | which subtype this row is |
+| `createdAt` | Date | automatic; no `updatedAt` — append-only |
 
----
+| Discriminator | Extra fields |
+|---|---|
+| `status_change` | `oldStatus`, `newStatus` (String) |
+| `assignment` | `oldAssignee` (ObjectId, nullable), `newAssignee` (ObjectId) |
+| `collaborator_added` / `collaborator_removed` | `collaborator` (ObjectId → User) |
+| `priority_change` | `oldPriority`, `newPriority` (String) |
+| `reply` / `internal_note` | `message` (ObjectId → Message) |
+| `archived` / `restored` | no extra fields — the event type itself is the whole fact |
 
-# 2. User Model
-
-The User model represents internal support staff.
-
-## Fields
-
-| Field        | Type   |  Required | Purpose               |
-| ------------ | ------ | --------: | --------------------- |
-| name         | String |       Yes | User's display name   |
-| email        | String |       Yes | Login identity        |
-| passwordHash | String |       Yes | Hashed password       |
-| role         | String |       Yes | Internal user role    |
-| createdAt    | Date   | Automatic | Creation timestamp    |
-| updatedAt    | Date   | Automatic | Last update timestamp |
-
-## Roles
-
-```text
-agent
-supervisor
-```
-
-The system uses these two internal roles for role-based authorization.
-
----
-
-# 3. Password Storage
-
-Passwords are never intended to be stored as plaintext.
-
-During registration:
-
-```text
-Plain password
-      ↓
-bcrypt.hash()
-      ↓
-passwordHash
-      ↓
-MongoDB
-```
-
-During login:
-
-```text
-Entered password
-      ↓
-bcrypt.compare()
-      ↓
-Stored passwordHash
-      ↓
-true / false
-```
-
-The database field is named `passwordHash` to make this responsibility explicit.
+### SLAAlert
+| Field | Type | Notes |
+|---|---|---|
+| `ticket` | ObjectId → Ticket, required | |
+| `type` | String enum: `at_risk`, `breached`, required | |
+| `acknowledged` | Boolean, default `false` | |
+| `acknowledgedBy` | ObjectId → User, default `null` | |
+| `acknowledgedAt` | Date, default `null` | |
+| `createdAt` / `updatedAt` | Date | automatic |
 
 ---
 
-# 4. Ticket Model
+## Which relationships are one-to-many versus many-to-many
 
-Ticket is the central domain entity.
+**One-to-many:**
+- `User` → `Ticket` (as `primaryAssignee`) — one agent, many tickets assigned to them
+- `Ticket` → `Message` — one ticket, many messages
+- `Ticket` → `TimelineEvent` — one ticket, many timeline rows
+- `Ticket` → `SLAAlert` — one ticket can have several alert *cycles* over its life (breach →
+  acknowledge → resolve → reopen → breach again → a second, independent alert row)
 
-## Fields
+**Many-to-many:**
+- `User` ↔ `Ticket` via `collaborators` — one agent can collaborate on many tickets, and one
+  ticket can have many collaborators. This is the one genuine many-to-many in the schema, and
+  it's modeled as a plain array of ObjectId references on `Ticket` rather than a separate join
+  collection, since the array is always small and bounded (a handful of agents per ticket, never
+  unbounded growth) — a join collection would be the textbook-correct move at a much larger
+  scale, but it buys nothing here.
 
-| Field               | Type              |  Required | Purpose                           |
-| ------------------- | ----------------- | --------: | --------------------------------- |
-| subject             | String            |       Yes | Ticket subject                    |
-| description         | String            |       Yes | Ticket description                |
-| requester           | Embedded object   |       Yes | Customer information              |
-| priority            | String            |       Yes | Ticket priority                   |
-| category            | String            |       Yes | Ticket category                   |
-| status              | String            |        No | Current ticket state              |
-| primaryAssignee     | ObjectId → User   |        No | Main responsible agent            |
-| collaborators       | ObjectId[] → User |        No | Other internal collaborators      |
-| archived            | Boolean           |        No | Archive state                     |
-| archivedAt          | Date              |        No | Archive timestamp                 |
-| slaTargetMinutes    | Number            |       Yes | SLA target associated with ticket |
-| clock.accumulatedMs | Number            |        No | Accumulated paused time           |
-| clock.pendingSince  | Date              |        No | Current Pending start time        |
-| closedAt            | Date              |        No | Closing timestamp                 |
-| createdAt           | Date              | Automatic | Creation timestamp                |
-| updatedAt           | Date              | Automatic | Last update timestamp             |
+**Not a relationship at all:** `Ticket.requester` looks like it should reference something, but
+it doesn't — there's no `Customer` collection, because customers never log in or have their own
+record in this system. See denormalization below for why that's deliberate, not an oversight.
 
 ---
 
-# 5. Requester
+## Which constraints live in the database versus the application
 
-Requester information is embedded inside Ticket.
+**Mongoose/schema-level (structural correctness only):**
+- Required fields, enum membership (`status`, `priority`, `category`, `role`, message/alert
+  `type`)
+- Email uniqueness (`User.email`)
+- One custom `pre("validate")` hook: a ticket's `primaryAssignee` cannot also appear in its own
+  `collaborators` array — this is the one piece of cross-field validation pushed down to the
+  schema level, because it's a pure data-shape rule with no role or timing dependency, unlike
+  everything below.
 
-```text
-requester
-├── name
-└── email
-```
+**Application-layer only (Mongoose/MongoDB has no way to express these):**
+- The entire status transition graph (`new → open → pending → resolved → closed`, plus the
+  reopen exceptions) — which moves are legal from which state
+- Closing a ticket requires the actor to be a supervisor
+- Reopening a closed ticket is rejected once the fixed reopen window has passed
+- The SLA clock pause/resume logic tied to status
+- "An agent can only act on a ticket where they're the primary assignee or a collaborator"
+- "An agent cannot reassign a ticket away from themselves"
+- Append-only enforcement on `TimelineEvent` — there is no update or delete *route* for it
+  anywhere in the API; Mongo itself would happily allow a write if one existed, so the guarantee
+  is entirely "we never built that endpoint," not a database-level immutability constraint
 
-The requester is not currently a separate authenticated User.
-
-This is intentional because the assessment focuses on the internal support workspace rather than a customer portal.
-
-This keeps the domain smaller and avoids introducing an unnecessary customer account system.
-
----
-
-# 6. Priority
-
-Allowed values:
-
-```text
-low
-medium
-high
-urgent
-```
-
-These values represent the ticket priority levels.
+The split follows one rule throughout: Mongoose validates that stored data has a *valid shape*;
+everything about whether a specific *operation* is allowed lives in the service/controller layer,
+because those rules depend on who's asking and what state something is currently in — information
+a schema-level validator doesn't have access to.
 
 ---
 
-# 7. Category
+## What was deliberately denormalized
 
-Current categories:
-
-```text
-billing
-technical
-account
-general
-```
-
-An enum is used to prevent inconsistent category values.
-
-For example, the database should not end up with several representations of the same category:
-
-```text
-billing
-Billing
-BILLING
-```
-
----
-
-# 8. Status
-
-Allowed values:
-
-```text
-new
-open
-pending
-resolved
-closed
-```
-
-The schema validates that the value is one of the supported states.
-
-The schema does not attempt to implement the complete lifecycle.
-
-Lifecycle rules belong to the application/service layer.
-
-Conceptually:
-
-```text
-NEW
- ↓
-OPEN
- ↓
-PENDING
- ↓
-OPEN
- ↓
-RESOLVED
- ↓
-CLOSED
-```
-
-Reopening and invalid transitions will be enforced by server-side business logic.
+- **`Ticket.slaTargetMinutes` is copied from the priority-to-minutes mapping at creation time**,
+  not recalculated from `priority` on every read. If the organization's SLA policy changes later
+  (urgent drops from 60 minutes to 30, say), existing tickets keep the target they were created
+  under rather than silently inheriting a new one. This is a deliberate snapshot, and it's the
+  reason `slaTargetMinutes` exists as its own field instead of being derived on the fly.
+- **`Ticket.requester` is embedded, not referenced.** A `Customer` collection was considered and
+  rejected — the brief requires requester information on a ticket, not a customer account or
+  portal, so the requester is ticket-specific contact data, not an independent entity with its
+  own identity to look up. The cost is that the same customer's name/email could appear
+  duplicated across several of their tickets; that's acceptable since there's no requirement to
+  ever query "all tickets from this customer" as a first-class feature.
+- **`Message` and `TimelineEvent` are separate collections from `Ticket`, not embedded arrays.**
+  A ticket can accumulate an unbounded number of replies and timeline events over its life;
+  embedding either would mean the `Ticket` document grows without limit and every ticket-list
+  query would either drag that growing array along or need a projection to exclude it. Keeping
+  them as their own collections, referenced by `ticket`, keeps the `Ticket` document itself small
+  and bounded regardless of how much conversation or history piles up.
 
 ---
 
-# 9. Primary Assignee
-
-```text
-Ticket.primaryAssignee
-        ↓
-      User
-```
-
-The field is optional because a newly created ticket may initially be unassigned.
-
-The primary assignee represents the main person responsible for the ticket.
-
----
-
-# 10. Collaborators
-
-```text
-Ticket.collaborators[]
-        ↓
-      User
-```
-
-A ticket can have zero or more collaborators.
-
-Example:
-
-```text
-primaryAssignee = Agent A
-
-collaborators = [
-    Agent B,
-    Agent C
-]
-```
-
-Collaborators are separate from the primary assignee because they represent additional people working on the ticket.
-
----
-
-# 11. Archive State
-
-The Ticket contains:
-
-```text
-archived
-archivedAt
-```
-
-`archived` represents the current state.
-
-`archivedAt` records when the ticket was archived.
-
-This allows tickets to be removed from normal queue views without deleting historical data.
-
----
-
-# 12. SLA Data
-
-Each Ticket stores:
-
-```text
-slaTargetMinutes
-clock
-├── accumulatedMs
-└── pendingSince
-```
-
-### `slaTargetMinutes`
-
-The SLA target is stored on the ticket instead of being recalculated from the current priority policy every time.
-
-This acts as a snapshot of the target associated with that ticket.
-
-### `accumulatedMs`
-
-Stores previously accumulated paused time.
-
-### `pendingSince`
-
-Stores the beginning of the current Pending period.
-
-The intended behavior is:
-
-```text
-OPEN
-  |
-  | clock running
-  v
-PENDING
-  |
-  | clock paused
-  v
-OPEN
-  |
-  | clock resumes
-  v
-...
-```
-
----
-
-# 13. Closed Timestamp
-
-```text
-closedAt
-```
-
-When a ticket becomes closed, this field records the closing time.
-
-When reopening behavior requires the ticket to become active again, the application can clear this value.
-
----
-
-# 14. Planned Message Model
-
-The Message model will be introduced when reply functionality is implemented.
-
-Conceptually:
-
-```text
-Message
-├── ticket
-├── author
-├── body
-├── type
-└── timestamps
-```
-
-Message types will distinguish between:
-
-```text
-reply
-internal_note
-```
-
-Replies are customer-visible.
-
-Internal notes are restricted to internal staff.
-
----
-
-# 15. Planned AuditEvent Model
-
-The audit model will represent immutable historical actions.
-
-Conceptually:
-
-```text
-AuditEvent
-├── ticket
-├── actor
-├── action
-├── metadata
-└── createdAt
-```
-
-Example:
-
-```json
-{
-    "action": "STATUS_CHANGED",
-    "metadata": {
-        "from": "open",
-        "to": "pending"
-    }
-}
-```
-
-The timeline should allow the application to explain:
-
-```text
-What changed?
-Who changed it?
-When did it change?
-```
-
----
-
-# 16. Planned SLAAlert Model
-
-SLA alerts will be stored separately because a ticket may have multiple alert events over its lifetime.
-
-Conceptually:
-
-```text
-SLAAlert
-├── ticket
-├── type
-├── status
-├── triggeredAt
-├── acknowledgedBy
-└── acknowledgedAt
-```
-
-Possible alert types:
-
-```text
-at_risk
-breached
-```
-
----
-
-# 17. Relationships
-
-```text
-User
- │
- ├── Ticket.primaryAssignee
- ├── Ticket.collaborators[]
- ├── Message.author
- └── AuditEvent.actor
-
-
-Ticket
- │
- ├── Message
- ├── AuditEvent
- └── SLAAlert
-```
-
-Requester information remains embedded within Ticket.
-
----
-
-# 18. Embedding vs Referencing
-
-| Data             | Decision            | Reason                                    |
-| ---------------- | ------------------- | ----------------------------------------- |
-| Requester        | Embedded            | Small and directly associated with Ticket |
-| SLA clock        | Embedded            | Small and tightly coupled with Ticket     |
-| Primary assignee | Reference           | Represents an independent User            |
-| Collaborators    | References          | Multiple independent Users                |
-| Messages         | Separate collection | Conversation can grow independently       |
-| Audit events     | Separate collection | Historical data can grow independently    |
-| SLA alerts       | Separate collection | Multiple alert cycles can occur           |
-
----
-
-# 19. Indexes
-
-Indexes are intentionally not part of the initial schema.
-
-They will be introduced after actual API query patterns are implemented.
-
-The intended future queries include:
-
-* Ticket queue filtering
-* My Work
-* Status filtering
-* Priority filtering
-* Category filtering
-* Assignee filtering
-* Sorting
-* SLA-related queries
-
-Indexes should be justified by actual access patterns rather than added speculatively.
+## What would break first at 100x the data
+
+- **Every `Ticket.find()` filter (status, priority, category, assignee) currently has no
+  supporting compound index.** At 100x the volume, the role-scoped queue list and any
+  filtered search would degrade into full collection scans. The first index I'd add is a
+  compound one ordered by the fields actually used together in `listTickets` —
+  `{ status: 1, priority: 1, category: 1, primaryAssignee: 1, createdAt: -1 }` — following the
+  equality-fields-then-sort-field ordering rule, since every one of those fields is filtered on
+  equality except the trailing sort.
+- **Search uses `$regex` over `subject`/`description`, not a `$text` index or a real search
+  service.** This was a deliberate simplification given this project's scale, but a `$regex`
+  scan doesn't use an index at all — it's the single query most likely to visibly slow down
+  first, and the honest next step would be either a MongoDB `$text` index (for basic relevance)
+  or Atlas Search (for anything closer to production-grade full-text search).
+- **The dashboard's SLA-breach count is computed in application code**, by fetching every
+  currently-active ticket and running `isBreached()` over the array in JavaScript, rather than
+  inside the aggregation pipeline. At small scale this is simpler and easier to reason about; at
+  100x the data, pulling every active ticket into Node just to filter it there would be the
+  first thing to rewrite as a proper aggregation stage.
+- **The SLA sweep job scans every ticket in a running state every 60 seconds, in full**, with no
+  incremental "only check tickets close to their target" narrowing. At 100x the tickets, this
+  sweep's cost grows linearly with the number of open tickets in the whole system, not with how
+  many are actually near breaching — the fix would be to only sweep tickets whose computed
+  time-remaining falls under some threshold, rather than every open ticket unconditionally.
