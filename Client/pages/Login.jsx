@@ -31,8 +31,14 @@ function Login() {
 
     return (
         <AuthBackground>
-            <Paper radius="md" p={0}>
-                <Title order={2} fw={600} mb={4}>
+            <Paper
+                radius="md"
+                p={{ base: "lg", sm: "xl" }}
+                w="100%"
+                maw={420}
+                mx="auto"
+            >
+                <Title order={2} fw={600} mb={4} style={{ fontSize: "clamp(1.25rem, 4vw, 1.75rem)" }}>
                     Welcome back
                 </Title>
                 <Text size="sm" c="dimmed" mb={28}>

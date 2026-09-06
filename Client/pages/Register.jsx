@@ -1,3 +1,4 @@
+// src/pages/Register.jsx
 
 import { useForm } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
@@ -38,8 +39,16 @@ function Register() {
 
     return (
         <AuthBackground>
-            <Paper withBorder shadow="sm" radius="md" p="xl" style={{ width: 380 }}>
-                <Title order={2} fw={600} mb={4}>
+            <Paper
+                withBorder
+                shadow="sm"
+                radius="md"
+                p={{ base: "lg", sm: "xl" }}
+                w="100%"
+                maw={380}
+                mx="auto"
+            >
+                <Title order={2} fw={600} mb={4} style={{ fontSize: "clamp(1.25rem, 4vw, 1.75rem)" }}>
                     Create account
                 </Title>
                 <Text size="sm" c="dimmed" mb="lg">
