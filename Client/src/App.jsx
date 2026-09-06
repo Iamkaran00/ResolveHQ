@@ -33,6 +33,13 @@ function App() {
   // two nav bars for a logged-in visitor who lands on it.
   const showAppNavbar = user && location.pathname !== "/";
 
+  // PublicFooter is only meant for the public-facing homepage — it was
+  // previously rendered outside <Routes> so it showed on every route,
+  // including authenticated pages like /tickets, where short content made
+  // it float up under the last row instead of sitting at the true bottom
+  // of the viewport.
+  const showPublicFooter = location.pathname === "/";
+
   return (
     <>
       {showAppNavbar && <Navbar />}
@@ -95,7 +102,7 @@ function App() {
         />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <PublicFooter/>
+      {showPublicFooter && <PublicFooter />}
     </>
   );
 }
