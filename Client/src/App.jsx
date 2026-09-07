@@ -15,7 +15,7 @@ import CreateTicket from '../pages/CreateTicket';
 import { getCurrentUser } from '../redux/operations/authOperations';
 import PublicFooter from '../components/PublicFooter';
 
-
+import LoadingScreen from '../pages/LoadingScreen';
 
 function App() {
   const dispatch = useDispatch();
@@ -26,7 +26,7 @@ function App() {
     dispatch(getCurrentUser());
   }, [dispatch]);
 
-  if (!authChecked) return null;
+  if (!authChecked) return <LoadingScreen/>;
 
   // "/" is the public homepage now, shown to everyone — it has its own
   // PublicNavbar, so skip the authenticated Navbar there to avoid stacking
