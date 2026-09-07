@@ -28,16 +28,8 @@ function App() {
 
   if (!authChecked) return <LoadingScreen/>;
 
-  // "/" is the public homepage now, shown to everyone — it has its own
-  // PublicNavbar, so skip the authenticated Navbar there to avoid stacking
-  // two nav bars for a logged-in visitor who lands on it.
   const showAppNavbar = user && location.pathname !== "/";
 
-  // PublicFooter is only meant for the public-facing homepage — it was
-  // previously rendered outside <Routes> so it showed on every route,
-  // including authenticated pages like /tickets, where short content made
-  // it float up under the last row instead of sitting at the true bottom
-  // of the viewport.
   const showPublicFooter = location.pathname === "/";
 
   return (

@@ -145,6 +145,10 @@ export default function TicketDetail() {
     const [collaboratorTarget, setCollaboratorTarget] = useState(null);
     const [submittingReply, setSubmittingReply] = useState(false);
 
+    // NEW: track in-flight async actions so the relevant buttons can show a spinner
+    const [archiving, setArchiving] = useState(false);
+    const [transitioningTo, setTransitioningTo] = useState(null);
+
     useEffect(() => {
         dispatch(fetchTicketById(id));
         dispatch(fetchMessages(id));
@@ -198,8 +202,10 @@ export default function TicketDetail() {
     };
 
     const handleArchiveToggle = async () => {
+        setArchiving(true);
         const action = ticket.archived ? restoreTicket : archiveTicket;
         const res = await dispatch(action(id));
+        setArchiving(false);
         if (res.success) {
             notifications.show({
                 title: ticket.archived ? "Restored" : "Archived",
@@ -212,7 +218,9 @@ export default function TicketDetail() {
     };
 
     const handleTransition = async (newStatus) => {
+        setTransitioningTo(newStatus);
         const res = await dispatch(updateTicketStatus(id, newStatus));
+        setTransitioningTo(null);
         if (res.success) {
             notifications.show({ title: "Status updated", message: `Ticket is now ${newStatus}.`, color: "teal" });
             dispatch(fetchTimeline(id));
@@ -319,6 +327,8 @@ export default function TicketDetail() {
                         radius="sm"
                         leftSection={ticket.archived ? <IconArchiveOff size={14} /> : <IconArchive size={14} />}
                         onClick={handleArchiveToggle}
+                        loading={archiving}
+                        disabled={archiving}
                     >
                         {ticket.archived ? "Restore ticket" : "Archive ticket"}
                     </Button>
@@ -581,6 +591,7 @@ export default function TicketDetail() {
                                     <Stack gap={8}>
                                         {availableTransitions.map((target) => {
                                             const closing = target === "closed";
+                                            const isLoadingThis = transitioningTo === target;
                                             return (
                                                 <Button
                                                     key={target}
@@ -589,6 +600,8 @@ export default function TicketDetail() {
                                                     variant={closing ? "filled" : "default"}
                                                     color={closing ? "red" : "dark"}
                                                     onClick={() => handleTransition(target)}
+                                                    loading={isLoadingThis}
+                                                    disabled={transitioningTo !== null && !isLoadingThis}
                                                     fullWidth
                                                 >
                                                     {ACTION_LABEL[`${ticket.status}>${target}`] || `Move to ${target}`}
