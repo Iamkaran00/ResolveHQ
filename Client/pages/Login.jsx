@@ -1,13 +1,17 @@
-// src/pages/Login.jsx
-
 import { useForm } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { TextInput, PasswordInput, Button, Title, Text, Alert, Paper } from "@mantine/core";
-import { IconAlertCircle, IconArrowRight } from "@tabler/icons-react";
+import { TextInput, PasswordInput, Button, Title, Text, Alert, Paper, Divider, Group } from "@mantine/core";
+import { IconAlertCircle, IconArrowRight, IconInfoCircle } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { login } from "../redux/operations/authOperations";
 import AuthBackground from "../components/AuthBackground";
+
+const DEMO_ACCOUNTS = [
+    { label: "Supervisor", email: "abhijeet@gmail.com", password: "abhijeet sahu" },
+    { label: "Agent", email: "rahul@gmail.com", password: "rahul sahu" },
+];
+const SHOW_DEMO = true;
 
 function Login() {
     const dispatch = useDispatch();
@@ -18,8 +22,14 @@ function Login() {
     const {
         register,
         handleSubmit,
+        setValue,
         formState: { errors },
     } = useForm({ defaultValues: { email: "", password: "" } });
+
+    const fillDemo = (acc) => {
+        setValue("email", acc.email, { shouldValidate: true });
+        setValue("password", acc.password, { shouldValidate: true });
+    };
 
     const onSubmit = async (data) => {
         const res = await dispatch(login(data.email, data.password));
@@ -31,13 +41,7 @@ function Login() {
 
     return (
         <AuthBackground>
-            <Paper
-                radius="md"
-                p={{ base: "lg", sm: "xl" }}
-                w="100%"
-                maw={420}
-                mx="auto"
-            >
+            <Paper radius="md" p={{ base: "lg", sm: "xl" }} w="100%" maw={420} mx="auto">
                 <Title order={2} fw={600} mb={4} style={{ fontSize: "clamp(1.25rem, 4vw, 1.75rem)" }}>
                     Welcome back
                 </Title>
@@ -81,6 +85,27 @@ function Login() {
                         Sign in
                     </Button>
                 </form>
+
+                {SHOW_DEMO && (
+                    <>
+                        <Divider label="Try a demo account" labelPosition="center" my="lg" />
+                        <Group grow mb="sm">
+                            {DEMO_ACCOUNTS.map((acc) => (
+                                <Button key={acc.label} variant="light" color="dark" onClick={() => fillDemo(acc)}>
+                                    {acc.label}
+                                </Button>
+                            ))}
+                        </Group>
+                        <Alert icon={<IconInfoCircle size={16} />} color="blue" variant="light" title="Why can't I pick a role?">
+                            <Text size="xs">
+                                Roles are assigned by the system, not chosen at login. If anyone could be a
+                                supervisor, the role would protect nothing: any user could reassign tickets, run
+                                bulk actions and see the audit timeline, and the audit trail couldn't be trusted.
+                                Only an existing supervisor can create or promote another one.
+                            </Text>
+                        </Alert>
+                    </>
+                )}
 
                 <Text size="sm" c="dimmed" ta="center" mt={24}>
                     No account?{" "}
