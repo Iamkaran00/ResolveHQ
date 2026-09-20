@@ -1,13 +1,13 @@
-// src/pages/Register.jsx
-
 import { useForm } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Link } from "react-router-dom";
 import { TextInput, PasswordInput, Button, Paper, Title, Text, Alert } from "@mantine/core";
-import { IconAlertCircle } from "@tabler/icons-react";
+import { IconAlertCircle, IconInfoCircle } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { signUp } from "../redux/operations/authOperations";
 import AuthBackground from "../components/AuthBackground";
+
+const SHOW_DEMO = true;
 
 function Register() {
     const dispatch = useDispatch();
@@ -52,12 +52,30 @@ function Register() {
                     Create account
                 </Title>
                 <Text size="sm" c="dimmed" mb="lg">
-                    New agents join as{" "}
+                    New accounts join as{" "}
                     <Text span fw={600} c="dark">
                         agent
-                    </Text>{" "}
-                    by default
+                    </Text>
+                    . Supervisor access can't be self-selected; an existing supervisor has to grant it.
                 </Text>
+
+                {SHOW_DEMO && (
+                    <Alert
+                        icon={<IconInfoCircle size={16} />}
+                        color="blue"
+                        variant="light"
+                        title="Just reviewing?"
+                        mb="lg"
+                    >
+                        <Text size="xs">
+                            Skip signup and use the one-click demo accounts (Supervisor and Agent) on the{" "}
+                            <Text component={Link} to="/login" span fw={600} c="dark" inherit>
+                                sign-in page
+                            </Text>
+                            .
+                        </Text>
+                    </Alert>
+                )}
 
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
                     <TextInput
