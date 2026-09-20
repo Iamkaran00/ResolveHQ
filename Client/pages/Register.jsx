@@ -56,7 +56,7 @@ function Register() {
                     <Text span fw={600} c="dark">
                         agent
                     </Text>
-                    . Supervisor access can't be self-selected; an existing supervisor has to grant it.
+                    . Supervisor access can't be self-selected.
                 </Text>
 
                 {SHOW_DEMO && (
