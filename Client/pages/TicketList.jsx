@@ -28,7 +28,8 @@ import {
     IconX, 
     IconArchiveOff,
     IconInbox,
-    IconPlus
+    IconPlus,
+    IconArrowRight
 } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 
@@ -151,6 +152,19 @@ function TicketList() {
         }
     };
 
+    // Single place that opens a ticket (used by the row click and the "See details" button)
+    const openTicket = (ticketId) => {
+        if (ticketId) {
+            navigate(`/tickets/${ticketId}`);
+        } else {
+            notifications.show({
+                title: "Cannot open ticket",
+                message: "This record is missing a valid ID.",
+                color: "red",
+            });
+        }
+    };
+
     // Animation variants for Framer Motion
     const tableRowVariants = {
         hidden: { opacity: 0, y: 10 },
@@ -163,6 +177,33 @@ function TicketList() {
 
     return (
         <Container size="xl" py="xl" style={{ fontFamily: "Inter, sans-serif" }}>
+            {/* Row hover styles: applied on cells so they don't fight Framer Motion's row opacity */}
+            <style>{`
+                .ticket-table td {
+                    transition: opacity 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+                }
+                /* fade every row except the one under the cursor */
+                .ticket-table tbody:hover .ticket-row:not(:hover) td {
+                    opacity: 0.55;
+                }
+                /* hovered row: soft tint + accent bar */
+                .ticket-table .ticket-row:hover td {
+                    background-color: var(--row-hover-bg);
+                }
+                .ticket-table .ticket-row:hover td:first-child {
+                    box-shadow: inset 3px 0 0 var(--row-accent);
+                }
+                /* details button: quiet by default, solid on row hover */
+                .ticket-view-btn {
+                    opacity: 0.65;
+                    transition: opacity 0.2s ease, transform 0.2s ease;
+                }
+                .ticket-row:hover .ticket-view-btn {
+                    opacity: 1;
+                    transform: translateX(2px);
+                }
+            `}</style>
+
             <Stack gap="lg">
                 {/* Header Section */}
                 <Group justify="space-between" align="flex-end">
@@ -347,9 +388,17 @@ function TicketList() {
                     withBorder
                     radius="md"
                     shadow="sm"
-                    style={{ overflow: "hidden", backgroundColor: isDark ? "#1A1B1E" : "#FFFFFF" }}
+                    style={{ overflowX: "auto", backgroundColor: isDark ? "#1A1B1E" : "#FFFFFF" }}
                 >
-                    <Table verticalSpacing="md" highlightOnHover style={{ minWidth: 800 }}>
+                    <Table
+                        className="ticket-table"
+                        verticalSpacing="md"
+                        style={{
+                            minWidth: 900,
+                            "--row-hover-bg": isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                            "--row-accent": isDark ? "#4dabf7" : "#212529",
+                        }}
+                    >
                         <Table.Thead style={{ background: isDark ? "#141517" : "#F8F9FA" }}>
                             <Table.Tr>
                                 <Table.Th w={50} pl="md">
@@ -368,6 +417,7 @@ function TicketList() {
                                 <Table.Th><Text size="xs" tt="uppercase" c="dimmed" fw={600}>Priority</Text></Table.Th>
                                 <Table.Th><Text size="xs" tt="uppercase" c="dimmed" fw={600}>Assignee</Text></Table.Th>
                                 <Table.Th><Text size="xs" tt="uppercase" c="dimmed" fw={600}>SLA</Text></Table.Th>
+                                <Table.Th w={130}></Table.Th>
                                 {isArchivedView && <Table.Th w={60}></Table.Th>}
                             </Table.Tr>
                         </Table.Thead>
@@ -379,25 +429,13 @@ function TicketList() {
                                 return (
                                     <motion.tr
                                         key={ticketId || `fallback-key-${i}`}
+                                        className="ticket-row"
                                         custom={i}
                                         variants={tableRowVariants}
                                         initial="hidden"
                                         animate="visible"
-                                        onClick={() => {
-                                            if (ticketId) {
-                                                navigate(`/tickets/${ticketId}`);
-                                            } else {
-                                                notifications.show({
-                                                    title: "Cannot open ticket",
-                                                    message: "This record is missing a valid ID.",
-                                                    color: "red"
-                                                });
-                                            }
-                                        }}
-                                        style={{
-                                            cursor: ticketId ? "pointer" : "not-allowed",
-                                            transition: "background-color 0.15s ease",
-                                        }}
+                                        onClick={() => openTicket(ticketId)}
+                                        style={{ cursor: ticketId ? "pointer" : "not-allowed" }}
                                     >
                                         <Table.Td pl="md" onClick={(e) => e.stopPropagation()}>
                                             {!isArchivedView && (
@@ -441,6 +479,23 @@ function TicketList() {
                                         <Table.Td>
                                             <SlaTimer ticket={ticket} />
                                         </Table.Td>
+
+                                        {/* See details button */}
+                                        <Table.Td onClick={(e) => e.stopPropagation()}>
+                                            <Button
+                                                className="ticket-view-btn"
+                                                variant="subtle"
+                                                size="compact-sm"
+                                                radius="md"
+                                                color={isDark ? "blue" : "dark"}
+                                                rightSection={<IconArrowRight size={14} />}
+                                                onClick={() => openTicket(ticketId)}
+                                                disabled={!ticketId}
+                                            >
+                                                See details
+                                            </Button>
+                                        </Table.Td>
+
                                         {isArchivedView && (
                                             <Table.Td onClick={(e) => e.stopPropagation()}>
                                                 <ActionIcon
