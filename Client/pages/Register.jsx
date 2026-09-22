@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, Link } from "react-router-dom";
-import { TextInput, PasswordInput, Button, Paper, Title, Text, Alert } from "@mantine/core";
+import { TextInput, PasswordInput, Button, Paper, Title, Text, Alert, SegmentedControl } from "@mantine/core";
 import { IconAlertCircle, IconInfoCircle } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { signUp } from "../redux/operations/authOperations";
@@ -18,15 +18,17 @@ function Register() {
         register,
         handleSubmit,
         watch,
+        setValue,
         formState: { errors },
     } = useForm({
-        defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
+        defaultValues: { name: "", email: "", password: "", confirmPassword: "", role: "agent" },
     });
 
     const password = watch("password");
+    const role = watch("role");
 
     const onSubmit = async (data) => {
-        const res = await dispatch(signUp(data.name, data.email, data.password));
+        const res = await dispatch(signUp(data.name, data.email, data.password, data.role));
         if (res.success) {
             notifications.show({
                 title: "Account created",
@@ -52,11 +54,7 @@ function Register() {
                     Create account
                 </Title>
                 <Text size="sm" c="dimmed" mb="lg">
-                    New accounts join as{" "}
-                    <Text span fw={600} c="dark">
-                        agent
-                    </Text>
-                    . Supervisor access can't be self-selected.
+                    Choose the role you want to join as.
                 </Text>
 
                 {SHOW_DEMO && (
@@ -78,6 +76,21 @@ function Register() {
                 )}
 
                 <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                    <Text size="sm" fw={500} mb={4}>
+                        Role
+                    </Text>
+                    <SegmentedControl
+                        fullWidth
+                        mb="sm"
+                        value={role}
+                        onChange={(value) => setValue("role", value)}
+                        data={[
+                            { label: "Agent", value: "agent" },
+                            { label: "Supervisor", value: "supervisor" },
+                        ]}
+                    />
+                    <input type="hidden" {...register("role")} />
+
                     <TextInput
                         label="Name"
                         autoComplete="name"
