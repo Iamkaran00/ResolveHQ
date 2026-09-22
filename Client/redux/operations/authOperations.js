@@ -7,11 +7,11 @@ import { auth_endpoints } from '../../services/api';
 
 const { SIGNUP_API, LOGIN_API, LOGOUT_API, GET_USER_API } = auth_endpoints;
 
-export const signUp = (name, email, password) => async (dispatch) => {
+export const signUp = (name, email, password, role) => async (dispatch) => {
     dispatch(setLoading(true));
     dispatch(setError(null));
     try {
-        const res = await apiConnector("POST", SIGNUP_API, { name, email, password });
+        const res = await apiConnector("POST", SIGNUP_API, { name, email, password, role });
         console.log(res , 'in sign up') ; 
         dispatch(setUser(res.data.user));
         return { success: true };
@@ -23,7 +23,6 @@ export const signUp = (name, email, password) => async (dispatch) => {
         dispatch(setLoading(false));
     }
 };
-
 export const login = (email, password) => async (dispatch) => {
     console.log(email); 
     dispatch(setLoading(true));
