@@ -21,40 +21,45 @@ const cookieOptions = {
   sameSite : "none" , 
   maxAge : 7*24*60*60*1000,
 };
- export const registerUser = async (req ,res) => {
-    try {
-      
-    const {name , email , password} = req.body ;  
-      console.log(name , email) ; 
-      
-    if(!name || !email || !password) {
-        return res.status(400).json( { success : false , message : "Fill Entries First!!!" })
+const VALID_ROLES = ["agent", "supervisor"];
+
+export const registerUser = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: "Fill Entries First!!!" });
     }
-    const existingUser = await User.findOne({email : email.toLowerCase().trim()}) ;
-    if(existingUser)  {
-        return res.status(409).json({              
-            success : false , 
-            message : "Email Already Exists."
-        })
+
+    const finalRole = VALID_ROLES.includes(role) ? role : "agent";
+
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "Email Already Exists."
+      });
     }
-    const hashpassword = await bcrypt.hash(password , 10); 
+
+    const hashpassword = await bcrypt.hash(password, 10);
     const user = await User.create({
-        name , 
-        email : email.toLowerCase().trim() , 
-        hashpassword,
-        role : "agent",                               
-    })
-    const token = generateToken(user) ; 
-    res.cookie('token' , token , cookieOptions) ; 
+      name,
+      email: email.toLowerCase().trim(),
+      hashpassword,
+      role: finalRole,
+    });
+
+    const token = generateToken(user);
+    res.cookie('token', token, cookieOptions);
     return res.status(201).json({
-        message : "Signup Succeed" , 
-        user :  { id : user._id , name : user.name , email : user.email , role : user.role }
-    })
-    } catch (error) {
-        console.log(error) ; 
-        return res.status(500).json({ message : error.message })
-    }
-}
+      message: "Signup Succeed",
+      user: { id: user._id, name: user.name, email: user.email, role: user.role }
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: error.message });
+  }
+};
 export const login  = async (req ,res) => {
     try {
         const {email , password} = req.body ; 
