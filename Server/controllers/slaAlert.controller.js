@@ -5,15 +5,23 @@ export const listAlerts = async (req, res) => {
   const alertFilter = { acknowledged: false };
 
   if (req.user.role === "agent") {
-    const myTickets = await Ticket.find({ primaryAssignee: req.user._id }, "_id");
+    const myTickets = await Ticket.find(
+      { $or: [{ primaryAssignee: req.user._id }, { collaborators: req.user._id }] },
+      "_id"
+    );
     alertFilter.ticket = { $in: myTickets.map((t) => t._id) };
   }
 
-  const alerts = await SLAAlert.find(alertFilter).populate("ticket", "subject status priority").sort({ createdAt: -1 });
+  const alerts = await SLAAlert.find(alertFilter)
+    .populate("ticket", "subject status priority primaryAssignee")
+    .sort({ createdAt: -1 });
   return res.status(200).json({ success: true, alerts, count: alerts.length });
 };
 
 export const acknowledgeAlert = async (req, res) => {
+   if (req.user.role !== "agent") {
+      return res.status(403).json({ success: false, message: "Only the assigned agent can acknowledge alerts" });
+    }
   const alert = await SLAAlert.findById(req.params.id).populate("ticket");
   if (!alert) return res.status(404).json({ success: false, message: "Alert not found" });
 
